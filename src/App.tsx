@@ -21,7 +21,10 @@ const evmTracingSchema = z.object({
     .string()
     .optional()
     .refine(
-      (val) => !val || val === '' || z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
+      (val) =>
+        !val ||
+        val === '' ||
+        z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
       {
         message: 'Must be a valid URL',
       }
@@ -30,7 +33,10 @@ const evmTracingSchema = z.object({
     .string()
     .optional()
     .refine(
-      (val) => !val || val === '' || z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
+      (val) =>
+        !val ||
+        val === '' ||
+        z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
       {
         message: 'Must be a valid URL',
       }

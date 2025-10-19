@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let url: URL
     try {
       url = new URL(targetUrl)
-    } catch (error) {
+    } catch {
       return res.status(400).json({ error: 'Invalid target URL' })
     }
 
