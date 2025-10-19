@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Flashpoint Studio is an EVM Tracing Debugger built with React, TypeScript, and Vite. The application provides a web interface for debugging and tracing Ethereum Virtual Machine (EVM) transactions.
+Flashpoint Studio is a web-based debugging and tracing tool for Ethereum Virtual Machine (EVM) transactions, built with React, TypeScript, and Vite.
 
 ## Development Commands
 

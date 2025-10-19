@@ -95,29 +95,51 @@ export class EtherscanClient {
     const uniqueAddresses = [...new Set(addresses.map((a) => a.toLowerCase()))]
     const abiMap = new Map<string, any[]>()
 
-    console.log(`Fetching ABIs for ${uniqueAddresses.length} contract(s) from Explorer API...`)
-
-    // Fetch ABIs with rate limiting (5 requests per second for free tier)
-    for (let i = 0; i < uniqueAddresses.length; i++) {
-      const address = uniqueAddresses[i]
-
-      // Skip if already in cache
+    // Return cached ABIs immediately
+    const addressesToFetch = uniqueAddresses.filter((address) => {
       if (this.abiCache.has(address)) {
         const abi = this.abiCache.get(address)
         if (abi) {
           abiMap.set(address, abi)
         }
-        continue
+        return false
       }
+      return true
+    })
 
-      const abi = await this.fetchContractAbi(address)
-      if (abi) {
-        abiMap.set(address, abi)
-      }
+    if (addressesToFetch.length === 0) {
+      console.log(`Using cached ABIs for ${uniqueAddresses.length} contract(s)`)
+      return abiMap
+    }
 
-      // Rate limiting: wait 200ms between requests (5 req/sec)
-      if (i < uniqueAddresses.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 200))
+    console.log(
+      `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${uniqueAddresses.length - addressesToFetch.length} cached)...`
+    )
+
+    // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
+    const batchSize = 5
+    const batches: string[][] = []
+
+    for (let i = 0; i < addressesToFetch.length; i += batchSize) {
+      batches.push(addressesToFetch.slice(i, i + batchSize))
+    }
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i]
+
+      // Fetch all addresses in this batch in parallel
+      const results = await Promise.all(batch.map((address) => this.fetchContractAbi(address)))
+
+      // Add successful results to map
+      results.forEach((abi, index) => {
+        if (abi) {
+          abiMap.set(batch[index], abi)
+        }
+      })
+
+      // Rate limiting: wait 1 second between batches (except for last batch)
+      if (i < batches.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     }
 
@@ -225,28 +247,51 @@ export class EtherscanClient {
     const uniqueAddresses = [...new Set(addresses.map((a) => a.toLowerCase()))]
     const nameMap = new Map<string, string>()
 
-    console.log(`Fetching contract names for ${uniqueAddresses.length} address(es)...`)
-
-    for (let i = 0; i < uniqueAddresses.length; i++) {
-      const address = uniqueAddresses[i]
-
-      // Skip if already in cache
+    // Return cached names immediately
+    const addressesToFetch = uniqueAddresses.filter((address) => {
       if (this.contractNameCache.has(address)) {
         const name = this.contractNameCache.get(address)
         if (name) {
           nameMap.set(address, name)
         }
-        continue
+        return false
       }
+      return true
+    })
 
-      const name = await this.fetchContractName(address)
-      if (name) {
-        nameMap.set(address, name)
-      }
+    if (addressesToFetch.length === 0) {
+      console.log(`Using cached contract names for ${uniqueAddresses.length} address(es)`)
+      return nameMap
+    }
 
-      // Rate limiting: wait 200ms between requests (5 req/sec)
-      if (i < uniqueAddresses.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 200))
+    console.log(
+      `Fetching contract names for ${addressesToFetch.length} address(es) (${uniqueAddresses.length - addressesToFetch.length} cached)...`
+    )
+
+    // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
+    const batchSize = 5
+    const batches: string[][] = []
+
+    for (let i = 0; i < addressesToFetch.length; i += batchSize) {
+      batches.push(addressesToFetch.slice(i, i + batchSize))
+    }
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i]
+
+      // Fetch all addresses in this batch in parallel
+      const results = await Promise.all(batch.map((address) => this.fetchContractName(address)))
+
+      // Add successful results to map
+      results.forEach((name, index) => {
+        if (name) {
+          nameMap.set(batch[index], name)
+        }
+      })
+
+      // Rate limiting: wait 1 second between batches (except for last batch)
+      if (i < batches.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     }
 

@@ -162,8 +162,60 @@ export function TraceVisualizer({
               const paramName = cf.inputParamNames?.[index] || `arg[${index}]`
               const paramType = cf.inputParamTypes?.[index]
 
-              // Check if this is a tuple/struct
+              // Check if this is an array of tuples (e.g., tuple[])
               if (
+                paramType &&
+                paramType.baseType === 'array' &&
+                paramType.arrayChildren &&
+                paramType.arrayChildren.baseType === 'tuple' &&
+                Array.isArray(arg) &&
+                paramType.arrayChildren.components
+              ) {
+                // Render array header
+                const arrayHeader = (
+                  <div key={`${index}-header`} className="ml-0 whitespace-nowrap">
+                    <span className="text-slate-500 dark:text-slate-500 dark:text-slate-400">
+                      {prefix}
+                      {childPrefix}│
+                    </span>{' '}
+                    <span className="text-slate-600 dark:text-slate-300">
+                      {' '}
+                      {paramName}: [{arg.length} items]
+                    </span>
+                  </div>
+                )
+
+                // Render each tuple in the array
+                const arrayItems = arg.map((tupleItem, tupleIndex) => {
+                  if (Array.isArray(tupleItem)) {
+                    return paramType.arrayChildren!.components!.map((component, fieldIndex) => {
+                      const fieldName = component.name || `field${fieldIndex}`
+                      const fieldValue = tupleItem[fieldIndex]
+                      return (
+                        <div
+                          key={`${index}-${tupleIndex}-${fieldIndex}`}
+                          className="ml-0 whitespace-nowrap"
+                        >
+                          <span className="text-slate-500 dark:text-slate-500 dark:text-slate-400">
+                            {prefix}
+                            {childPrefix}│
+                          </span>{' '}
+                          <span className="text-slate-600 dark:text-slate-300">
+                            {' '}
+                            {paramName}[{tupleIndex}].{fieldName}:
+                          </span>{' '}
+                          {formatValue(fieldValue)}
+                        </div>
+                      )
+                    })
+                  }
+                  return null
+                })
+
+                return [arrayHeader, ...arrayItems]
+              }
+              // Check if this is a single tuple/struct
+              else if (
                 paramType &&
                 paramType.baseType === 'tuple' &&
                 Array.isArray(arg) &&
@@ -327,7 +379,58 @@ export function TraceVisualizer({
                   const paramName = cf.outputParamNames?.[index] || `[${index}]`
                   const paramType = cf.outputParamTypes?.[index]
 
+                  // Check if this is an array of tuples (e.g., tuple[])
                   if (
+                    paramType &&
+                    paramType.baseType === 'array' &&
+                    paramType.arrayChildren &&
+                    paramType.arrayChildren.baseType === 'tuple' &&
+                    Array.isArray(value) &&
+                    paramType.arrayChildren.components
+                  ) {
+                    // Render array header
+                    const arrayHeader = (
+                      <div key={`${index}-header`} className="ml-0 whitespace-nowrap">
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {prefix}
+                          {childPrefix}│
+                        </span>{' '}
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {paramName}: [{value.length} items]
+                        </span>
+                      </div>
+                    )
+
+                    // Render each tuple in the array
+                    const arrayItems = value.map((tupleItem, tupleIndex) => {
+                      if (Array.isArray(tupleItem)) {
+                        return paramType.arrayChildren!.components!.map((component, fieldIndex) => {
+                          const fieldName = component.name || `field${fieldIndex}`
+                          const fieldValue = tupleItem[fieldIndex]
+                          return (
+                            <div
+                              key={`${index}-${tupleIndex}-${fieldIndex}`}
+                              className="ml-0 whitespace-nowrap"
+                            >
+                              <span className="text-slate-500 dark:text-slate-400">
+                                {prefix}
+                                {childPrefix}│
+                              </span>{' '}
+                              <span className="text-slate-600 dark:text-slate-300">
+                                {paramName}[{tupleIndex}].{fieldName}:
+                              </span>{' '}
+                              {formatValue(fieldValue)}
+                            </div>
+                          )
+                        })
+                      }
+                      return null
+                    })
+
+                    return [arrayHeader, ...arrayItems]
+                  }
+                  // Check if this is a single tuple/struct
+                  else if (
                     paramType &&
                     paramType.baseType === 'tuple' &&
                     Array.isArray(value) &&

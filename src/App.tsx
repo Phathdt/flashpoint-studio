@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -13,17 +13,28 @@ import type { SimulationResult } from '@/lib/types'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 
 const evmTracingSchema = z.object({
-  rpcUrl: z.string().url('Must be a valid URL'),
+  rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
   payload: z.string().min(1, 'Payload is required'),
   fromAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
   toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
   apiEtherscanUrl: z
     .string()
-    .url('Must be a valid URL')
     .optional()
-    .or(z.literal(''))
-    .default('https://api.etherscan.io/v2/api'),
-  etherscanUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+    .refine(
+      (val) => !val || val === '' || z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
+      {
+        message: 'Must be a valid URL',
+      }
+    ),
+  etherscanUrl: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || val === '' || z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
+      {
+        message: 'Must be a valid URL',
+      }
+    ),
   etherscanApiKey: z.string().optional(),
 })
 
@@ -33,15 +44,20 @@ function App() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [result, setResult] = useState<SimulationResult | null>(null)
 
+  const form = useForm<EVMTracingFormData>({
+    resolver: zodResolver(evmTracingSchema),
+    defaultValues: {
+      apiEtherscanUrl: 'https://api.etherscan.io/v2/api',
+    },
+  })
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<EVMTracingFormData>({
-    resolver: zodResolver(evmTracingSchema),
-  })
+  } = form
 
-  const onSimulate = async (data: EVMTracingFormData) => {
+  const onSimulate: SubmitHandler<EVMTracingFormData> = async (data) => {
     console.log('Simulating with data:', data)
     setIsSimulating(true)
     setResult(null)
@@ -91,7 +107,7 @@ function App() {
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold">EVM Tracing Debugger</h1>
+            <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
             <p className="text-muted-foreground">Debug and trace EVM transactions</p>
           </div>
 
@@ -166,7 +182,6 @@ function App() {
                   <Label htmlFor="etherscanApiKey">Etherscan API Key (Optional)</Label>
                   <Input
                     id="etherscanApiKey"
-                    type="password"
                     placeholder="Your Etherscan API key"
                     {...register('etherscanApiKey')}
                   />
