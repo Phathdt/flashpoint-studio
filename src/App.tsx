@@ -52,9 +52,7 @@ function App() {
 
   const form = useForm<EVMTracingFormData>({
     resolver: zodResolver(evmTracingSchema),
-    defaultValues: {
-      apiEtherscanUrl: 'https://api.etherscan.io/v2/api',
-    },
+    defaultValues: {},
   })
 
   const {
