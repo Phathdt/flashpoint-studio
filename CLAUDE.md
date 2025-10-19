@@ -76,8 +76,29 @@ Components are configured with:
 
 Configuration: components.json
 
-### Current Implementation Status
-The application currently has a functional form UI but the EVM tracing simulation logic is not yet implemented (see TODO at src/App.tsx:31).
+### EVM Tracing Implementation
+The application implements a complete EVM transaction tracing and debugging system:
+
+**Core Services** (src/lib/):
+- `trace-client.ts` - Executes `debug_traceCall` RPC method to get transaction traces
+- `etherscan-client.ts` - Fetches contract ABIs and names from Etherscan/Blockscout APIs
+- `simulation-service.ts` - Main service orchestrating trace execution and ABI fetching
+- `types.ts` - TypeScript interfaces for trace data structures
+
+**Key Features**:
+- Direct RPC communication using ethers.js from the browser
+- Support for `debug_traceCall` with automatic fallback if not supported
+- Optional Etherscan integration for automatic ABI and contract name fetching
+- Comprehensive error handling and decoding
+- Real-time transaction simulation without backend
+
+**Data Flow**:
+1. User submits form with RPC URL, addresses, payload, and optional Etherscan config
+2. `SimulationService` creates `TraceClient` and `EtherscanClient` instances
+3. Transaction is traced using `debug_traceCall` RPC method
+4. Contract addresses are extracted from trace
+5. ABIs and contract names are fetched from Etherscan (if configured)
+6. Results are displayed with success/error status and trace details
 
 ## Adding New shadcn/ui Components
 
