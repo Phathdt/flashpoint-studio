@@ -1,77 +1,128 @@
-import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+const evmTracingSchema = z.object({
+  rpcUrl: z.string().url('Must be a valid URL'),
+  payload: z.string().min(1, 'Payload is required'),
+  fromAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
+  toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
+  etherscanUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  etherscanApiKey: z.string().optional(),
+})
+
+type EVMTracingFormData = z.infer<typeof evmTracingSchema>
 
 function App() {
-  const [count, setCount] = useState(0)
-  const [name, setName] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<EVMTracingFormData>({
+    resolver: zodResolver(evmTracingSchema),
+  })
+
+  const onSimulate = async (data: EVMTracingFormData) => {
+    console.log('Simulating with data:', data)
+    // TODO: Implement RPC call
+  }
 
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
-          <p className="text-muted-foreground">Built with Vite + React + Tailwind + shadcn/ui</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Counter Example</CardTitle>
-              <CardDescription>Test the shadcn/ui button component</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-2xl font-bold text-center p-4 bg-secondary rounded-lg">
-                Count: {count}
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => setCount(count + 1)} className="flex-1">
-                  Increment
-                </Button>
-                <Button onClick={() => setCount(count - 1)} variant="outline" className="flex-1">
-                  Decrement
-                </Button>
-                <Button onClick={() => setCount(0)} variant="destructive">
-                  Reset
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Input Example</CardTitle>
-              <CardDescription>Test the shadcn/ui input component</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Enter your name..."
-                value={name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-              />
-              {name && (
-                <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                  <p className="text-sm font-medium">Hello, {name}!</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <h1 className="text-4xl font-bold">EVM Tracing Debugger</h1>
+          <p className="text-muted-foreground">Debug and trace EVM transactions</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Setup Complete!</CardTitle>
-            <CardDescription>Your project is ready with the following:</CardDescription>
+            <CardTitle>Transaction Configuration</CardTitle>
+            <CardDescription>Enter the details for your EVM transaction trace</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="list-disc list-inside space-y-2 text-sm">
-              <li>Vite 7.1.7 + React 19.1.1 + TypeScript 5.9.3</li>
-              <li>Tailwind CSS 4.1.14 with Vite plugin</li>
-              <li>shadcn/ui components (Button, Card, Input)</li>
-              <li>Path aliases configured (@/ imports)</li>
-              <li>Dark/Light mode CSS variables</li>
-            </ul>
+            <form onSubmit={handleSubmit(onSimulate)} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="rpcUrl">RPC URL</Label>
+                <Input
+                  id="rpcUrl"
+                  placeholder="https://eth-mainnet.g.alchemy.com/v2/..."
+                  {...register('rpcUrl')}
+                />
+                {errors.rpcUrl && (
+                  <p className="text-sm text-destructive">{errors.rpcUrl.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payload">Payload</Label>
+                <Input
+                  id="payload"
+                  placeholder="0x..."
+                  {...register('payload')}
+                />
+                {errors.payload && (
+                  <p className="text-sm text-destructive">{errors.payload.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fromAddress">From Address</Label>
+                <Input
+                  id="fromAddress"
+                  placeholder="0x..."
+                  {...register('fromAddress')}
+                />
+                {errors.fromAddress && (
+                  <p className="text-sm text-destructive">{errors.fromAddress.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="toAddress">To Address</Label>
+                <Input
+                  id="toAddress"
+                  placeholder="0x..."
+                  {...register('toAddress')}
+                />
+                {errors.toAddress && (
+                  <p className="text-sm text-destructive">{errors.toAddress.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="etherscanUrl">Etherscan URL (Optional)</Label>
+                <Input
+                  id="etherscanUrl"
+                  placeholder="https://api.etherscan.io"
+                  {...register('etherscanUrl')}
+                />
+                {errors.etherscanUrl && (
+                  <p className="text-sm text-destructive">{errors.etherscanUrl.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="etherscanApiKey">Etherscan API Key (Optional)</Label>
+                <Input
+                  id="etherscanApiKey"
+                  type="password"
+                  placeholder="Your Etherscan API key"
+                  {...register('etherscanApiKey')}
+                />
+                {errors.etherscanApiKey && (
+                  <p className="text-sm text-destructive">{errors.etherscanApiKey.message}</p>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full" size="lg">
+                Simulate
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
