@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,6 +12,8 @@ import { Toaster } from '@/components/ui/sonner'
 import { SimulationService } from '@/lib/simulation-service'
 import type { SimulationResult } from '@/lib/types'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
+import { PrivateBinShareClient } from '@/lib/privatebin-client'
+import { ShareModal } from '@/components/ShareModal'
 
 const evmTracingSchema = z.object({
   rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
@@ -49,6 +52,10 @@ type EVMTracingFormData = z.infer<typeof evmTracingSchema>
 function App() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [result, setResult] = useState<SimulationResult | null>(null)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+  const [privateBinUrl, setPrivateBinUrl] = useState('')
+  const [isSharing, setIsSharing] = useState(false)
 
   const form = useForm<EVMTracingFormData>({
     resolver: zodResolver(evmTracingSchema),
@@ -59,7 +66,61 @@ function App() {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
+    getValues,
   } = form
+
+  // Load data from URL parameter on mount
+  useEffect(() => {
+    const loadFromPrivateBin = async () => {
+      const privatebinClient = new PrivateBinShareClient()
+      const shareUrl = privatebinClient.getShareUrlFromParams()
+
+      if (shareUrl) {
+        try {
+          toast.info('Loading shared transaction data...')
+          const data = await privatebinClient.fetchPaste(shareUrl)
+
+          // Populate form fields (rpcUrl is not shared for security reasons)
+          if (data.payload) setValue('payload', data.payload)
+          if (data.fromAddress) setValue('fromAddress', data.fromAddress)
+          if (data.toAddress) setValue('toAddress', data.toAddress)
+
+          // Restore simulation result if available
+          if (data.simulationResult) {
+            const restoredResult: SimulationResult = {
+              success: data.simulationResult.success,
+              trace: data.simulationResult.trace,
+              parsedTrace: data.simulationResult.parsedTrace,
+              contractNames: data.simulationResult.contractNames
+                ? new Map(Object.entries(data.simulationResult.contractNames))
+                : undefined,
+              chainId: data.simulationResult.chainId,
+              etherscanUrl: data.simulationResult.etherscanUrl,
+              error: data.simulationResult.error,
+              errorDetails: data.simulationResult.errorDetails,
+            }
+            setResult(restoredResult)
+
+            const resultMsg = restoredResult.success
+              ? 'Transaction data and simulation results loaded!'
+              : 'Transaction data loaded (simulation failed)'
+
+            toast.success(resultMsg)
+          } else {
+            toast.success('Transaction data loaded successfully')
+          }
+        } catch (error) {
+          console.error('Failed to load from PrivateBin:', error)
+          toast.error('Failed to load shared data', {
+            description: error instanceof Error ? error.message : 'Unknown error',
+          })
+        }
+      }
+    }
+
+    loadFromPrivateBin()
+  }, [setValue])
 
   const onSimulate: SubmitHandler<EVMTracingFormData> = async (data) => {
     console.log('Simulating with data:', data)
@@ -105,9 +166,81 @@ function App() {
     }
   }
 
+  const onShare = async () => {
+    const values = getValues()
+
+    // Validate required fields for sharing
+    if (!values.payload || !values.fromAddress || !values.toAddress) {
+      toast.error('Missing required fields', {
+        description: 'Please fill in payload, from address, and to address before sharing',
+      })
+      return
+    }
+
+    setIsSharing(true)
+
+    try {
+      const privatebinClient = new PrivateBinShareClient()
+
+      // Prepare simulation result data (if available)
+      let simulationResultData
+      if (result) {
+        simulationResultData = {
+          success: result.success,
+          trace: result.trace,
+          parsedTrace: result.parsedTrace,
+          contractNames: result.contractNames
+            ? Object.fromEntries(result.contractNames)
+            : undefined,
+          chainId: result.chainId,
+          etherscanUrl: result.etherscanUrl,
+          error: result.error,
+          errorDetails: result.errorDetails,
+        }
+      }
+
+      const privatebinResponse = await privatebinClient.createPaste({
+        payload: values.payload,
+        fromAddress: values.fromAddress,
+        toAddress: values.toAddress,
+        simulationResult: simulationResultData,
+        // Note: rpcUrl is intentionally excluded for security (may contain API keys)
+      })
+
+      // Generate both URLs
+      const url = privatebinClient.generateShareableUrl(privatebinResponse.url)
+      const pbUrl = privatebinClient.getPrivateBinUrl(privatebinResponse.url)
+
+      setShareUrl(url)
+      setPrivateBinUrl(pbUrl)
+      setShareModalOpen(true)
+
+      const description = result
+        ? 'Link includes transaction data and simulation results'
+        : 'Link includes transaction data (simulate first to include results)'
+
+      toast.success('Share link created!', {
+        description,
+      })
+    } catch (error) {
+      console.error('Failed to create share link:', error)
+      toast.error('Failed to create share link', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
   return (
     <>
       <Toaster />
+      <ShareModal
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        shareUrl={shareUrl}
+        privateBinUrl={privateBinUrl}
+      />
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-2">
@@ -194,9 +327,22 @@ function App() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" size="lg" disabled={isSimulating}>
-                  {isSimulating ? 'Simulating...' : 'Simulate'}
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={onShare}
+                    disabled={isSharing}
+                    className="flex-1"
+                  >
+                    <Share2 className="mr-2 h-4 w-4" />
+                    {isSharing ? 'Creating link...' : 'Share'}
+                  </Button>
+                  <Button type="submit" className="flex-1" size="lg" disabled={isSimulating}>
+                    {isSimulating ? 'Simulating...' : 'Simulate'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
