@@ -103,7 +103,7 @@ export function ShareModal({ open, onOpenChange, shareUrl, privateBinUrl }: Shar
           )}
 
           <p className="text-sm text-muted-foreground">
-            Data is end-to-end encrypted and stored securely for 1 day
+            Data is end-to-end encrypted and stored securely for 7 days
           </p>
         </div>
       </DialogContent>

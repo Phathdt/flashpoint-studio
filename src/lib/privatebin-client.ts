@@ -15,9 +15,12 @@ export interface ShareableData {
   // Simulation result (if available)
   simulationResult?: {
     success: boolean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     trace?: any
     parsedTrace?: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       frame: any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       stats: any
     }
     contractNames?: Record<string, string> // Convert Map to object for JSON serialization
@@ -50,6 +53,7 @@ export class PrivateBinShareClient {
   /**
    * Convert BigInt values to strings for JSON serialization
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private serializeBigInt(obj: any): any {
     if (obj === null || obj === undefined) {
       return obj
@@ -64,6 +68,7 @@ export class PrivateBinShareClient {
     }
 
     if (typeof obj === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result: any = {}
       for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -91,10 +96,10 @@ export class PrivateBinShareClient {
       // Prepare the message
       const message = JSON.stringify(serializedData, null, 2)
 
-      // Configure paste options - simple: 1 day expiry, text format
+      // Configure paste options - simple: 7 days expiry, text format
       const opts = {
         textformat: 'plaintext' as const,
-        expire: '1day' as const,
+        expire: '1week' as const,
         burnafterreading: 0 as const,
         opendiscussion: 0 as const,
         output: 'text' as const,
