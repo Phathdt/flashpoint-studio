@@ -268,14 +268,6 @@ function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="payload">Payload</Label>
-                  <Input id="payload" placeholder="0x..." {...register('payload')} />
-                  {errors.payload && (
-                    <p className="text-sm text-destructive">{errors.payload.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="fromAddress">From Address</Label>
                   <Input id="fromAddress" placeholder="0x..." {...register('fromAddress')} />
                   {errors.fromAddress && (
@@ -288,6 +280,14 @@ function App() {
                   <Input id="toAddress" placeholder="0x..." {...register('toAddress')} />
                   {errors.toAddress && (
                     <p className="text-sm text-destructive">{errors.toAddress.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payload">Payload</Label>
+                  <Input id="payload" placeholder="0x..." {...register('payload')} />
+                  {errors.payload && (
+                    <p className="text-sm text-destructive">{errors.payload.message}</p>
                   )}
                 </div>
 
