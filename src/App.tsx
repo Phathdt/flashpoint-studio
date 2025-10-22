@@ -14,6 +14,7 @@ import type { SimulationResult } from '@/lib/types'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { PrivateBinShareClient } from '@/lib/privatebin-client'
 import { ShareModal } from '@/components/ShareModal'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const evmTracingSchema = z.object({
   rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
@@ -235,6 +236,7 @@ function App() {
   return (
     <>
       <Toaster />
+      <ThemeToggle />
       <ShareModal
         open={shareModalOpen}
         onOpenChange={setShareModalOpen}
@@ -375,7 +377,7 @@ function App() {
                     ) : result.trace ? (
                       <div className="space-y-2">
                         <h3 className="font-semibold">Trace Details (Raw)</h3>
-                        <pre className="overflow-auto rounded-lg bg-slate-50 p-4 text-xs dark:bg-slate-900">
+                        <pre className="overflow-auto rounded-lg bg-muted p-4 text-xs">
                           {JSON.stringify(result.trace, null, 2)}
                         </pre>
                       </div>
@@ -399,7 +401,7 @@ function App() {
                     {result.errorDetails && (
                       <div className="space-y-2">
                         <h3 className="font-semibold">Error Details</h3>
-                        <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+                        <div className="rounded-lg bg-muted p-4">
                           <dl className="space-y-2 text-sm">
                             <div>
                               <dt className="font-medium text-slate-600 dark:text-slate-400">

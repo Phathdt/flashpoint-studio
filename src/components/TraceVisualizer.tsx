@@ -110,14 +110,14 @@ export function TraceVisualizer({
 
   const getCallTypeColor = (type: string): string => {
     const colors: Record<string, string> = {
-      CALL: 'text-cyan-500 dark:text-cyan-300',
-      DELEGATECALL: 'text-fuchsia-500 dark:text-fuchsia-300',
-      STATICCALL: 'text-yellow-500 dark:text-yellow-300',
-      CREATE: 'text-green-500 dark:text-green-300',
-      CREATE2: 'text-green-500 dark:text-green-300',
-      SELFDESTRUCT: 'text-red-500 dark:text-red-300',
+      CALL: 'text-cyan-600 dark:text-cyan-400',
+      DELEGATECALL: 'text-fuchsia-600 dark:text-fuchsia-400',
+      STATICCALL: 'text-yellow-600 dark:text-yellow-400',
+      CREATE: 'text-green-600 dark:text-green-400',
+      CREATE2: 'text-green-600 dark:text-green-400',
+      SELFDESTRUCT: 'text-red-600 dark:text-red-400',
     }
-    return colors[type] || 'text-slate-500 dark:text-slate-300'
+    return colors[type] || 'text-slate-600 dark:text-slate-400'
   }
 
   const renderCallFrame = (
@@ -532,17 +532,15 @@ export function TraceVisualizer({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="border-b-2 border-slate-300 pb-2 dark:border-slate-700">
+      <div className="border-b-2 border-border pb-2">
         <h3 className="text-center text-xl font-bold">TRANSACTION TRACE</h3>
       </div>
 
       {/* Trace tree */}
-      <div className="overflow-x-auto rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-        {renderCallFrame(frame)}
-      </div>
+      <div className="overflow-x-auto rounded-lg bg-muted p-4">{renderCallFrame(frame)}</div>
 
       {/* Summary */}
-      <div className="space-y-2 border-t-2 border-slate-300 pt-4 dark:border-slate-700">
+      <div className="space-y-2 border-t-2 border-border pt-4">
         <h3 className="text-center text-xl font-bold">SUMMARY</h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
