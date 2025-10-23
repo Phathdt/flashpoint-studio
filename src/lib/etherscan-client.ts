@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getCache } from './indexeddb-cache'
 
 export interface EtherscanConfig {
   apiKey: string
@@ -32,11 +33,22 @@ export class EtherscanClient {
    * @returns Contract ABI or null if not found
    */
   async fetchContractAbi(address: string): Promise<any[] | null> {
-    // Check cache first
     const cacheKey = address.toLowerCase()
+
+    // Check in-memory cache first (fastest)
     if (this.abiCache.has(cacheKey)) {
-      console.debug(`Using cached ABI for ${address}`)
+      console.debug(`Using in-memory cached ABI for ${address}`)
       return this.abiCache.get(cacheKey) || null
+    }
+
+    // Check IndexedDB cache (persistent across sessions)
+    const cache = getCache()
+    const cachedAbi = await cache.getAbi(cacheKey, this.config.chainId)
+    if (cachedAbi) {
+      console.debug(`Using IndexedDB cached ABI for ${address}`)
+      // Also populate in-memory cache for faster subsequent access
+      this.abiCache.set(cacheKey, cachedAbi)
+      return cachedAbi
     }
 
     try {
@@ -73,7 +85,9 @@ export class EtherscanClient {
 
       if (data.status === '1' && data.result) {
         const abi = JSON.parse(data.result)
+        // Cache in both in-memory and IndexedDB
         this.abiCache.set(cacheKey, abi)
+        await cache.setAbi(cacheKey, abi, this.config.chainId)
         console.log(`✓ Fetched ABI for ${address}`)
         return abi
       } else {
@@ -185,10 +199,22 @@ export class EtherscanClient {
    * @returns Contract name or null if not found
    */
   async fetchContractName(address: string): Promise<string | null> {
-    // Check cache first
     const cacheKey = address.toLowerCase()
+
+    // Check in-memory cache first (fastest)
     if (this.contractNameCache.has(cacheKey)) {
+      console.debug(`Using in-memory cached contract name for ${address}`)
       return this.contractNameCache.get(cacheKey) || null
+    }
+
+    // Check IndexedDB cache (persistent across sessions)
+    const cache = getCache()
+    const cachedName = await cache.getContractName(cacheKey, this.config.chainId)
+    if (cachedName) {
+      console.debug(`Using IndexedDB cached contract name for ${address}`)
+      // Also populate in-memory cache for faster subsequent access
+      this.contractNameCache.set(cacheKey, cachedName)
+      return cachedName
     }
 
     try {
@@ -225,7 +251,9 @@ export class EtherscanClient {
       if (data.status === '1' && data.result && data.result.length > 0) {
         const contractName = data.result[0].ContractName
         if (contractName) {
+          // Cache in both in-memory and IndexedDB
           this.contractNameCache.set(cacheKey, contractName)
+          await cache.setContractName(cacheKey, contractName, this.config.chainId)
           console.debug(`Contract name for ${address}: ${contractName}`)
           return contractName
         }
