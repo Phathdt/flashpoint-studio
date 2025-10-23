@@ -17,8 +17,6 @@ export interface EtherscanConfig {
  */
 export class EtherscanClient {
   private config: EtherscanConfig
-  private abiCache: Map<string, any[]> = new Map()
-  private contractNameCache: Map<string, string> = new Map()
   private isV2Api: boolean
 
   constructor(config: EtherscanConfig) {
@@ -35,19 +33,11 @@ export class EtherscanClient {
   async fetchContractAbi(address: string): Promise<any[] | null> {
     const cacheKey = address.toLowerCase()
 
-    // Check in-memory cache first (fastest)
-    if (this.abiCache.has(cacheKey)) {
-      console.debug(`Using in-memory cached ABI for ${address}`)
-      return this.abiCache.get(cacheKey) || null
-    }
-
-    // Check IndexedDB cache (persistent across sessions)
+    // Check IndexedDB cache first
     const cache = getCache()
     const cachedAbi = await cache.getAbi(cacheKey, this.config.chainId)
     if (cachedAbi) {
-      console.debug(`Using IndexedDB cached ABI for ${address}`)
-      // Also populate in-memory cache for faster subsequent access
-      this.abiCache.set(cacheKey, cachedAbi)
+      console.debug(`Using cached ABI for ${address}`)
       return cachedAbi
     }
 
@@ -85,8 +75,7 @@ export class EtherscanClient {
 
       if (data.status === '1' && data.result) {
         const abi = JSON.parse(data.result)
-        // Cache in both in-memory and IndexedDB
-        this.abiCache.set(cacheKey, abi)
+        // Cache in IndexedDB
         await cache.setAbi(cacheKey, abi, this.config.chainId)
         console.log(`✓ Fetched ABI for ${address}`)
         return abi
@@ -109,25 +98,30 @@ export class EtherscanClient {
     const uniqueAddresses = [...new Set(addresses.map((a) => a.toLowerCase()))]
     const abiMap = new Map<string, any[]>()
 
-    // Return cached ABIs immediately
-    const addressesToFetch = uniqueAddresses.filter((address) => {
-      if (this.abiCache.has(address)) {
-        const abi = this.abiCache.get(address)
-        if (abi) {
-          abiMap.set(address, abi)
-        }
-        return false
+    // Check IndexedDB cache for all addresses
+    const cache = getCache()
+    const addressesToFetch: string[] = []
+
+    for (const address of uniqueAddresses) {
+      const cachedAbi = await cache.getAbi(address, this.config.chainId)
+      if (cachedAbi) {
+        abiMap.set(address, cachedAbi)
+      } else {
+        addressesToFetch.push(address)
       }
-      return true
-    })
+    }
 
     if (addressesToFetch.length === 0) {
-      console.log(`Using cached ABIs for ${uniqueAddresses.length} contract(s)`)
+      const cachedCount = uniqueAddresses.length
+      if (cachedCount > 0) {
+        console.log(`Using cached ABIs for ${cachedCount} contract(s)`)
+      }
       return abiMap
     }
 
+    const cachedCount = uniqueAddresses.length - addressesToFetch.length
     console.log(
-      `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${uniqueAddresses.length - addressesToFetch.length} cached)...`
+      `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${cachedCount} cached)...`
     )
 
     // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
@@ -186,14 +180,6 @@ export class EtherscanClient {
   }
 
   /**
-   * Get all cached ABIs
-   * @returns Array of all ABIs in cache
-   */
-  getAllCachedAbis(): any[] {
-    return Array.from(this.abiCache.values())
-  }
-
-  /**
    * Fetch contract source code info (including contract name)
    * @param address Contract address
    * @returns Contract name or null if not found
@@ -201,19 +187,11 @@ export class EtherscanClient {
   async fetchContractName(address: string): Promise<string | null> {
     const cacheKey = address.toLowerCase()
 
-    // Check in-memory cache first (fastest)
-    if (this.contractNameCache.has(cacheKey)) {
-      console.debug(`Using in-memory cached contract name for ${address}`)
-      return this.contractNameCache.get(cacheKey) || null
-    }
-
-    // Check IndexedDB cache (persistent across sessions)
+    // Check IndexedDB cache first
     const cache = getCache()
     const cachedName = await cache.getContractName(cacheKey, this.config.chainId)
     if (cachedName) {
-      console.debug(`Using IndexedDB cached contract name for ${address}`)
-      // Also populate in-memory cache for faster subsequent access
-      this.contractNameCache.set(cacheKey, cachedName)
+      console.debug(`Using cached contract name for ${address}`)
       return cachedName
     }
 
@@ -251,8 +229,7 @@ export class EtherscanClient {
       if (data.status === '1' && data.result && data.result.length > 0) {
         const contractName = data.result[0].ContractName
         if (contractName) {
-          // Cache in both in-memory and IndexedDB
-          this.contractNameCache.set(cacheKey, contractName)
+          // Cache in IndexedDB
           await cache.setContractName(cacheKey, contractName, this.config.chainId)
           console.debug(`Contract name for ${address}: ${contractName}`)
           return contractName
@@ -275,25 +252,30 @@ export class EtherscanClient {
     const uniqueAddresses = [...new Set(addresses.map((a) => a.toLowerCase()))]
     const nameMap = new Map<string, string>()
 
-    // Return cached names immediately
-    const addressesToFetch = uniqueAddresses.filter((address) => {
-      if (this.contractNameCache.has(address)) {
-        const name = this.contractNameCache.get(address)
-        if (name) {
-          nameMap.set(address, name)
-        }
-        return false
+    // Check IndexedDB cache for all addresses
+    const cache = getCache()
+    const addressesToFetch: string[] = []
+
+    for (const address of uniqueAddresses) {
+      const cachedName = await cache.getContractName(address, this.config.chainId)
+      if (cachedName) {
+        nameMap.set(address, cachedName)
+      } else {
+        addressesToFetch.push(address)
       }
-      return true
-    })
+    }
 
     if (addressesToFetch.length === 0) {
-      console.log(`Using cached contract names for ${uniqueAddresses.length} address(es)`)
+      const cachedCount = uniqueAddresses.length
+      if (cachedCount > 0) {
+        console.log(`Using cached contract names for ${cachedCount} address(es)`)
+      }
       return nameMap
     }
 
+    const cachedCount = uniqueAddresses.length - addressesToFetch.length
     console.log(
-      `Fetching contract names for ${addressesToFetch.length} address(es) (${uniqueAddresses.length - addressesToFetch.length} cached)...`
+      `Fetching contract names for ${addressesToFetch.length} address(es) (${cachedCount} cached)...`
     )
 
     // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
@@ -325,21 +307,5 @@ export class EtherscanClient {
 
     console.log(`✓ Fetched ${nameMap.size} contract name(s)`)
     return nameMap
-  }
-
-  /**
-   * Get all contract names from cache
-   * @returns Map of address to contract name
-   */
-  getAllContractNames(): Map<string, string> {
-    return new Map(this.contractNameCache)
-  }
-
-  /**
-   * Clear ABI cache
-   */
-  clearCache(): void {
-    this.abiCache.clear()
-    this.contractNameCache.clear()
   }
 }

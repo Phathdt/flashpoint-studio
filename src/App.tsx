@@ -3,7 +3,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Share2 } from 'lucide-react'
+import { Share2, Copy, ClipboardPaste } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -247,6 +247,63 @@ function App() {
     }
   }
 
+  const onCopyToClipboard = async () => {
+    const values = getValues()
+
+    // Copy all form data to clipboard as JSON
+    const formData = {
+      rpcUrl: values.rpcUrl || '',
+      fromAddress: values.fromAddress || '',
+      toAddress: values.toAddress || '',
+      payload: values.payload || '',
+      blockNumber: values.blockNumber || '',
+      apiEtherscanUrl: values.apiEtherscanUrl || '',
+      etherscanUrl: values.etherscanUrl || '',
+      etherscanApiKey: values.etherscanApiKey || '',
+    }
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(formData, null, 2))
+      toast.success('Copied to clipboard!', {
+        description: 'Form data has been copied',
+      })
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+      toast.error('Failed to copy', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+
+  const onPasteFromClipboard = async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const formData = JSON.parse(clipboardText) as Partial<EVMTracingFormData>
+
+      // Set each field if it exists in the clipboard data
+      if (formData.rpcUrl !== undefined) setValue('rpcUrl', formData.rpcUrl)
+      if (formData.fromAddress !== undefined) setValue('fromAddress', formData.fromAddress)
+      if (formData.toAddress !== undefined) setValue('toAddress', formData.toAddress)
+      if (formData.payload !== undefined) setValue('payload', formData.payload)
+      if (formData.blockNumber !== undefined) setValue('blockNumber', formData.blockNumber)
+      if (formData.apiEtherscanUrl !== undefined)
+        setValue('apiEtherscanUrl', formData.apiEtherscanUrl)
+      if (formData.etherscanUrl !== undefined) setValue('etherscanUrl', formData.etherscanUrl)
+      if (formData.etherscanApiKey !== undefined)
+        setValue('etherscanApiKey', formData.etherscanApiKey)
+
+      toast.success('Pasted from clipboard!', {
+        description: 'Form data has been restored',
+      })
+    } catch (error) {
+      console.error('Failed to paste from clipboard:', error)
+      toast.error('Failed to paste', {
+        description:
+          error instanceof Error ? error.message : 'Invalid clipboard data or permission denied',
+      })
+    }
+  }
+
   return (
     <>
       <Toaster />
@@ -356,6 +413,24 @@ function App() {
                 </div>
 
                 <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={onCopyToClipboard}
+                    title="Copy form data to clipboard"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={onPasteFromClipboard}
+                    title="Paste form data from clipboard"
+                  >
+                    <ClipboardPaste className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"

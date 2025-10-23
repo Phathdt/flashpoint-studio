@@ -121,20 +121,20 @@ export class SimulationService {
 
         if (addresses.length > 0) {
           console.log('Fetching ABIs and contract names from Etherscan...')
-          await Promise.all([
+          const [abiMap, nameMap] = await Promise.all([
             etherscanClient.fetchMultipleAbis(addresses),
             etherscanClient.fetchMultipleContractNames(addresses),
           ])
 
-          // Get fetched ABIs and add to function decoder
-          const fetchedAbis = etherscanClient.getAllCachedAbis()
+          // Add fetched ABIs to function decoder
+          const fetchedAbis = Array.from(abiMap.values())
           if (fetchedAbis.length > 0) {
             console.log(`✓ Successfully fetched ${fetchedAbis.length} ABI(s)`)
             functionDecoder = new FunctionDecoder(fetchedAbis)
           }
 
-          // Get contract names
-          contractNames = etherscanClient.getAllContractNames()
+          // Store contract names
+          contractNames = nameMap
         }
 
         // Parse the trace
