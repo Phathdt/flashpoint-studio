@@ -81,9 +81,30 @@ export class SimulationService {
         chainId: chainId,
       })
 
+      // Determine block tag - use provided blockNumber or default to 'latest'
+      let blockTag: string = 'latest'
+      if (request.blockNumber) {
+        const blockNum = request.blockNumber.trim()
+        // If it's a decimal number, convert to hex with 0x prefix
+        if (/^\d+$/.test(blockNum)) {
+          blockTag = '0x' + parseInt(blockNum, 10).toString(16)
+          console.log(`Using block number: ${blockNum} (${blockTag})`)
+        } else if (/^0x[0-9a-fA-F]+$/i.test(blockNum)) {
+          // Already in hex format with 0x prefix
+          blockTag = blockNum
+          console.log(`Using block number: ${blockTag}`)
+        } else {
+          // Treat as special tag like 'latest', 'earliest', 'pending'
+          blockTag = blockNum
+          console.log(`Using block tag: ${blockTag}`)
+        }
+      } else {
+        console.log('Using latest block')
+      }
+
       // Execute trace
       console.log('Attempting to trace transaction...')
-      const traceResult = await traceClient.traceCallSafe(tx, 'latest', {
+      const traceResult = await traceClient.traceCallSafe(tx, blockTag, {
         timeout: 10000,
       })
 

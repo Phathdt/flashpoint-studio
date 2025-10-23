@@ -21,6 +21,19 @@ const evmTracingSchema = z.object({
   payload: z.string().min(1, 'Payload is required'),
   fromAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
   toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
+  blockNumber: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val === '') return true
+        // Allow decimal numbers or hex numbers (0x prefix)
+        return /^\d+$/.test(val) || /^0x[0-9a-fA-F]+$/.test(val)
+      },
+      {
+        message: 'Must be a valid block number (decimal or hex with 0x prefix)',
+      }
+    ),
   apiEtherscanUrl: z
     .string()
     .optional()
@@ -135,6 +148,7 @@ function App() {
         payload: data.payload,
         fromAddress: data.fromAddress,
         toAddress: data.toAddress,
+        blockNumber: data.blockNumber,
         apiEtherscanUrl: data.apiEtherscanUrl,
         etherscanUrl: data.etherscanUrl,
         etherscanApiKey: data.etherscanApiKey,
@@ -290,6 +304,18 @@ function App() {
                   <Input id="payload" placeholder="0x..." {...register('payload')} />
                   {errors.payload && (
                     <p className="text-sm text-destructive">{errors.payload.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="blockNumber">Block Number (Optional)</Label>
+                  <Input
+                    id="blockNumber"
+                    placeholder="latest (or specify: 5000000 or 0x4C4B40)"
+                    {...register('blockNumber')}
+                  />
+                  {errors.blockNumber && (
+                    <p className="text-sm text-destructive">{errors.blockNumber.message}</p>
                   )}
                 </div>
 

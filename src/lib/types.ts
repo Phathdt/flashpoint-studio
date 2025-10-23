@@ -30,6 +30,7 @@ export interface SimulationRequest {
   payload: string
   fromAddress: string
   toAddress: string
+  blockNumber?: string
   apiEtherscanUrl?: string
   etherscanUrl?: string
   etherscanApiKey?: string
