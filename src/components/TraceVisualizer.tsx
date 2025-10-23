@@ -1,5 +1,6 @@
 import type { ParsedCallFrame, TraceStats } from '@/lib/trace-parser'
 import { getAddressUrl } from '@/lib/etherscan-utils'
+import { toast } from 'sonner'
 
 interface TraceVisualizerProps {
   frame: ParsedCallFrame
@@ -16,6 +17,18 @@ export function TraceVisualizer({
   chainId = 1,
   etherscanUrl,
 }: TraceVisualizerProps) {
+  const handleCopyValue = async (value: string, label?: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success('Copied to clipboard', {
+        description: label ? `${label}` : 'Value copied',
+        duration: 1500,
+      })
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      toast.error('Failed to copy to clipboard')
+    }
+  }
   const formatGas = (gas: bigint): string => {
     return gas.toLocaleString('en-US')
   }
@@ -59,17 +72,26 @@ export function TraceVisualizer({
     )
   }
 
-  const formatValue = (value: unknown): React.ReactNode => {
+  const formatValue = (value: unknown, label?: string): React.ReactNode => {
     if (typeof value === 'bigint') {
+      const stringValue = value.toString()
       return (
-        <span className="font-mono text-orange-600 dark:text-orange-300">{value.toString()}</span>
+        <span
+          className="cursor-pointer font-mono text-orange-600 hover:underline dark:text-orange-300"
+          onClick={() => handleCopyValue(stringValue, label)}
+          title="Click to copy"
+        >
+          {stringValue}
+        </span>
       )
     } else if (typeof value === 'boolean') {
       return (
         <span
-          className={
+          className={`cursor-pointer hover:underline ${
             value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-          }
+          }`}
+          onClick={() => handleCopyValue(value.toString(), label)}
+          title="Click to copy"
         >
           {value ? 'true' : 'false'}
         </span>
@@ -80,31 +102,74 @@ export function TraceVisualizer({
         return formatAddress(value)
       } else if (value.length > 66) {
         return (
-          <span className="font-mono text-slate-800 dark:text-slate-100">
+          <span
+            className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+            onClick={() => handleCopyValue(value, label)}
+            title="Click to copy full value"
+          >
             {value.slice(0, 66)}...{' '}
             <span className="text-slate-600 dark:text-slate-400">({value.length} chars)</span>
           </span>
         )
       } else if (/^0x[a-fA-F0-9]+$/.test(value)) {
         // It's a hex string
-        return <span className="font-mono text-slate-800 dark:text-slate-100">{value}</span>
+        return (
+          <span
+            className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+            onClick={() => handleCopyValue(value, label)}
+            title="Click to copy"
+          >
+            {value}
+          </span>
+        )
       } else {
-        return <span className="font-mono text-slate-800 dark:text-slate-100">{value}</span>
+        return (
+          <span
+            className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+            onClick={() => handleCopyValue(value, label)}
+            title="Click to copy"
+          >
+            {value}
+          </span>
+        )
       }
     } else if (Array.isArray(value)) {
+      const stringValue = JSON.stringify(value, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v
+      )
       return (
-        <span className="font-mono text-slate-800 dark:text-slate-100">
-          {JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}
+        <span
+          className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+          onClick={() => handleCopyValue(stringValue, label)}
+          title="Click to copy array"
+        >
+          {stringValue.length > 100 ? `${stringValue.slice(0, 100)}...` : stringValue}
         </span>
       )
     } else if (typeof value === 'object' && value !== null) {
+      const stringValue = JSON.stringify(value, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v
+      )
       return (
-        <span className="font-mono text-slate-800 dark:text-slate-100">
-          {JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}
+        <span
+          className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+          onClick={() => handleCopyValue(stringValue, label)}
+          title="Click to copy object"
+        >
+          {stringValue.length > 100 ? `${stringValue.slice(0, 100)}...` : stringValue}
         </span>
       )
     } else {
-      return <span className="font-mono text-slate-800 dark:text-slate-100">{String(value)}</span>
+      const stringValue = String(value)
+      return (
+        <span
+          className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+          onClick={() => handleCopyValue(stringValue, label)}
+          title="Click to copy"
+        >
+          {stringValue}
+        </span>
+      )
     }
   }
 
@@ -205,7 +270,7 @@ export function TraceVisualizer({
                             {' '}
                             {paramName}[{tupleIndex}].{fieldName}:
                           </span>{' '}
-                          {formatValue(fieldValue)}
+                          {formatValue(fieldValue, `${paramName}[${tupleIndex}].${fieldName}`)}
                         </div>
                       )
                     })
@@ -235,7 +300,7 @@ export function TraceVisualizer({
                         {' '}
                         {paramName}.{fieldName}:
                       </span>{' '}
-                      {formatValue(fieldValue)}
+                      {formatValue(fieldValue, `${paramName}.${fieldName}`)}
                     </div>
                   )
                 })
@@ -247,7 +312,7 @@ export function TraceVisualizer({
                       {childPrefix}│
                     </span>{' '}
                     <span className="text-slate-600 dark:text-slate-300"> {paramName}:</span>{' '}
-                    {formatValue(arg)}
+                    {formatValue(arg, paramName)}
                   </div>
                 )
               }
@@ -420,7 +485,7 @@ export function TraceVisualizer({
                               <span className="text-slate-600 dark:text-slate-300">
                                 {paramName}[{tupleIndex}].{fieldName}:
                               </span>{' '}
-                              {formatValue(fieldValue)}
+                              {formatValue(fieldValue, `${paramName}[${tupleIndex}].${fieldName}`)}
                             </div>
                           )
                         })
@@ -449,7 +514,7 @@ export function TraceVisualizer({
                           <span className="text-slate-600 dark:text-slate-300">
                             {paramName}.{fieldName}:
                           </span>{' '}
-                          {formatValue(fieldValue)}
+                          {formatValue(fieldValue, `${paramName}.${fieldName}`)}
                         </div>
                       )
                     })
@@ -461,7 +526,7 @@ export function TraceVisualizer({
                           {childPrefix}│
                         </span>{' '}
                         <span className="text-slate-600 dark:text-slate-300">{paramName}:</span>{' '}
-                        {formatValue(value)}
+                        {formatValue(value, paramName)}
                       </div>
                     )
                   }

@@ -10,6 +10,7 @@ A powerful web-based debugging and tracing tool for Ethereum Virtual Machine (EV
 - 💾 **Persistent Caching**: IndexedDB-based caching for ABIs and contract names (7-day expiration) to minimize API calls
 - 🔗 **Share with PrivateBin**: Encrypted sharing of transaction configurations and results via PrivateBin (7-day expiration)
 - 📋 **Copy/Paste Form Data**: Copy all form inputs to clipboard as JSON and paste them back to quickly duplicate configurations
+- 📄 **Click-to-Copy Trace Values**: Click any parameter value in the trace visualization to copy it to clipboard (including full values for truncated displays)
 - ⚡ **Real-time Simulation**: Simulate transactions without deploying or interacting with actual contracts
 - 🎨 **Modern UI**: Built with shadcn/ui components and Tailwind CSS for a clean, responsive interface
 
@@ -89,3 +90,4 @@ src/
 5. 💾 System checks IndexedDB cache for previously fetched ABIs and contract names
 6. 🔎 Missing ABIs and contract names are fetched from Etherscan and cached for 7 days
 7. ✨ Results are displayed with detailed trace information including decoded function calls
+8. 📄 Click any parameter value in the trace to instantly copy it to your clipboard
