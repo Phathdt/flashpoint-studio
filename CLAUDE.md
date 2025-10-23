@@ -84,13 +84,22 @@ The application implements a complete EVM transaction tracing and debugging syst
 - `etherscan-client.ts` - Fetches contract ABIs and names from Etherscan/Blockscout APIs with IndexedDB caching
 - `simulation-service.ts` - Main service orchestrating trace execution and ABI fetching
 - `indexeddb-cache.ts` - Persistent browser-side cache for ABIs and contract names (7-day expiration)
+- `privatebin-client.ts` - End-to-end encrypted sharing via PrivateBin (uses @pixelfactory/privatebin)
 - `types.ts` - TypeScript interfaces for trace data structures
+
+**Components** (src/components/):
+- `TraceVisualizer.tsx` - Renders transaction trace as a tree structure with decoded function calls
+- `ShareModal.tsx` - Modal dialog for sharing with copy-to-clipboard functionality
+- `ui/` - shadcn/ui component library (New York variant)
 
 **Key Features**:
 - Direct RPC communication using ethers.js from the browser
 - Support for `debug_traceCall` with automatic fallback if not supported
 - Optional Etherscan integration for automatic ABI and contract name fetching
 - Persistent IndexedDB caching to minimize API calls and improve performance
+- End-to-end encrypted sharing via PrivateBin with 7-day expiration
+- Copy/paste form data to clipboard as JSON for quick configuration duplication
+- URL parameter-based auto-fill for shared transactions
 - Comprehensive error handling and decoding
 - Real-time transaction simulation without backend
 
@@ -110,6 +119,54 @@ The application implements a complete EVM transaction tracing and debugging syst
 5. For each address, `EtherscanClient` checks IndexedDB cache first, then fetches from Etherscan API if not cached
 6. Fetched ABIs/names are stored in IndexedDB for future use
 7. Results are displayed with success/error status and trace details
+
+### Sharing Architecture
+
+**Component**: `src/components/ShareModal.tsx`
+**Service**: `src/lib/privatebin-client.ts`
+
+The application supports encrypted sharing of transaction configurations and simulation results:
+
+**How it works**:
+1. User clicks "Share" button to create an encrypted paste on PrivateBin (https://privatebin.net)
+2. Transaction data (payload, addresses, optional simulation results) is serialized with BigInt handling
+3. Data is encrypted client-side with a random 32-byte key using AES-256
+4. Encrypted paste is uploaded to PrivateBin with 7-day expiration
+5. A compact share URL is generated: `pasteId#base58EncodedKey`
+6. Two share options are provided:
+   - **Application share link**: `https://app.url?share=pasteId#key` (auto-fills form on load)
+   - **Direct PrivateBin link**: `https://privatebin.net/?pasteId#key` (view raw encrypted data)
+7. Copy-to-clipboard buttons use the Clipboard API with visual feedback (check icon)
+
+**Security notes**:
+- RPC URLs are intentionally NOT shared (may contain API keys)
+- Encryption key never leaves the browser (stored in URL hash fragment)
+- PrivateBin server cannot decrypt the data
+- Pastes auto-expire after 7 days
+
+### Copy/Paste Form Data
+
+The application provides copy/paste buttons to quickly duplicate form configurations:
+
+**Copy button** (`src/App.tsx:250-276`):
+- Collects all current form values (RPC URL, addresses, payload, block number, Etherscan config)
+- Serializes to formatted JSON (2-space indentation)
+- Writes to clipboard using `navigator.clipboard.writeText()`
+- Shows success toast notification
+
+**Paste button** (`src/App.tsx:278-305`):
+- Reads JSON from clipboard using `navigator.clipboard.readText()`
+- Parses JSON and validates structure
+- Sets each form field individually using React Hook Form's `setValue()`
+- Shows success toast on successful paste, error toast on failure
+
+**Use cases**:
+- Quick backup of current configuration before making changes
+- Duplicate configurations for testing variations
+- Share configurations via other channels (Slack, email, etc.)
+- Restore previously saved configurations
+
+**Button location**: Form action buttons row alongside Share and Simulate buttons
 
 ### Trace Visualization
 
