@@ -81,24 +81,49 @@ The application implements a complete EVM transaction tracing and debugging syst
 
 **Core Services** (src/lib/):
 - `trace-client.ts` - Executes `debug_traceCall` RPC method to get transaction traces
-- `etherscan-client.ts` - Fetches contract ABIs and names from Etherscan/Blockscout APIs
+- `etherscan-client.ts` - Fetches contract ABIs and names from Etherscan/Blockscout APIs with IndexedDB caching
 - `simulation-service.ts` - Main service orchestrating trace execution and ABI fetching
+- `indexeddb-cache.ts` - Persistent browser-side cache for ABIs and contract names (7-day expiration)
 - `types.ts` - TypeScript interfaces for trace data structures
 
 **Key Features**:
 - Direct RPC communication using ethers.js from the browser
 - Support for `debug_traceCall` with automatic fallback if not supported
 - Optional Etherscan integration for automatic ABI and contract name fetching
+- Persistent IndexedDB caching to minimize API calls and improve performance
 - Comprehensive error handling and decoding
 - Real-time transaction simulation without backend
 
+**Caching Architecture**:
+- All fetched ABIs and contract names are stored in IndexedDB via a singleton cache instance
+- Cache is persistent across browser sessions and page reloads
+- Chain-aware caching: different chains have separate cache entries (using chainId)
+- Automatic cache expiration after 7 days
+- `EtherscanClient` uses **only** IndexedDB (no in-memory cache) to ensure consistency
+- On each simulation, `fetchMultipleAbis()` and `fetchMultipleContractNames()` check IndexedDB first before making API calls
+
 **Data Flow**:
 1. User submits form with RPC URL, addresses, payload, and optional Etherscan config
-2. `SimulationService` creates `TraceClient` and `EtherscanClient` instances
+2. `SimulationService` creates `TraceClient` and `EtherscanClient` instances (each simulation creates new instances)
 3. Transaction is traced using `debug_traceCall` RPC method
 4. Contract addresses are extracted from trace
-5. ABIs and contract names are fetched from Etherscan (if configured)
-6. Results are displayed with success/error status and trace details
+5. For each address, `EtherscanClient` checks IndexedDB cache first, then fetches from Etherscan API if not cached
+6. Fetched ABIs/names are stored in IndexedDB for future use
+7. Results are displayed with success/error status and trace details
+
+### Trace Visualization
+
+**Component**: `src/components/TraceVisualizer.tsx`
+
+Renders the parsed transaction trace in a tree structure showing:
+- Call hierarchy with visual connectors (├─, └─, │)
+- Call types (CALL, DELEGATECALL, STATICCALL, etc.)
+- Contract addresses with Etherscan links
+- Decoded function signatures and parameters
+- Input/output data and error information
+- Gas usage statistics
+
+**Important**: When rendering nested calls recursively, ensure React keys include both the call frame properties AND the index to prevent duplicate key warnings. The key format is: `${from}-${to}-${depth}-${index}`
 
 ## Adding New shadcn/ui Components
 
