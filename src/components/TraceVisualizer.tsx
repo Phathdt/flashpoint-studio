@@ -124,7 +124,8 @@ export function TraceVisualizer({
     cf: ParsedCallFrame,
     prefix: string = '',
     isLast: boolean = true,
-    isRoot: boolean = true
+    isRoot: boolean = true,
+    index: number = 0
   ): React.ReactNode => {
     const connector = isRoot ? '' : isLast ? '└─' : '├─'
     const childPrefix = isRoot ? '' : isLast ? '   ' : '│  '
@@ -132,7 +133,7 @@ export function TraceVisualizer({
     const valueStr = cf.value > 0n ? ` {value: ${cf.value.toString()} wei}` : ''
 
     return (
-      <div key={`${cf.from}-${cf.to}-${cf.depth}`} className="font-mono text-sm">
+      <div key={`${cf.from}-${cf.to}-${cf.depth}-${index}`} className="font-mono text-sm">
         {/* Main call line */}
         <div className="whitespace-nowrap">
           <span className="text-slate-500 dark:text-slate-500 dark:text-slate-400">
@@ -523,7 +524,7 @@ export function TraceVisualizer({
         {cf.calls.map((call, index) => {
           const isLastChild = index === cf.calls.length - 1
           const nestedPrefix = prefix + childPrefix
-          return renderCallFrame(call, nestedPrefix, isLastChild, false)
+          return renderCallFrame(call, nestedPrefix, isLastChild, false, index)
         })}
       </div>
     )
