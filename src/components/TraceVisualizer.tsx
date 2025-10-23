@@ -218,7 +218,13 @@ export function TraceVisualizer({
             {childPrefix}├─
           </span>{' '}
           <span className="font-bold text-slate-800 dark:text-slate-200">Function:</span>{' '}
-          <span className="text-cyan-600 dark:text-cyan-300">{cf.functionSignature}</span>
+          <span
+            className="cursor-pointer text-cyan-600 hover:underline dark:text-cyan-300"
+            onClick={() => handleCopyValue(cf.functionSignature, 'Function')}
+            title="Click to copy"
+          >
+            {cf.functionSignature}
+          </span>
         </div>
 
         {/* Decoded input arguments */}
@@ -327,11 +333,27 @@ export function TraceVisualizer({
             {childPrefix}├─
           </span>{' '}
           <span className="font-bold text-slate-800 dark:text-slate-200">Gas:</span>{' '}
-          <span className="text-yellow-600 dark:text-yellow-300">{formatGas(cf.gas)}</span>{' '}
+          <span
+            className="cursor-pointer text-yellow-600 hover:underline dark:text-yellow-300"
+            onClick={() => handleCopyValue(cf.gas.toString(), 'Gas')}
+            title="Click to copy"
+          >
+            {formatGas(cf.gas)}
+          </span>{' '}
           <span className="text-slate-700 dark:text-slate-200">(Used:</span>{' '}
-          <span className="text-yellow-600 dark:text-yellow-300">{formatGas(cf.gasUsed)}</span>
+          <span
+            className="cursor-pointer text-yellow-600 hover:underline dark:text-yellow-300"
+            onClick={() => handleCopyValue(cf.gasUsed.toString(), 'Gas Used')}
+            title="Click to copy"
+          >
+            {formatGas(cf.gasUsed)}
+          </span>
           <span className="text-slate-700 dark:text-slate-200">,</span>{' '}
-          <span className="text-orange-600 dark:text-orange-300">
+          <span
+            className="cursor-pointer text-orange-600 hover:underline dark:text-orange-300"
+            onClick={() => handleCopyValue(cf.gasPercentage.toFixed(1), 'Gas Percentage')}
+            title="Click to copy"
+          >
             {cf.gasPercentage.toFixed(1)}%
           </span>
           <span className="text-slate-700 dark:text-slate-200">)</span>
@@ -374,7 +396,11 @@ export function TraceVisualizer({
                     <span className="font-bold text-slate-800 dark:text-slate-200">
                       Raw Error Data:
                     </span>{' '}
-                    <span className="font-mono text-slate-800 dark:text-slate-100">
+                    <span
+                      className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+                      onClick={() => handleCopyValue(cf.output || '', 'Raw Error Data')}
+                      title="Click to copy"
+                    >
                       {cf.output}
                     </span>
                   </div>
@@ -540,7 +566,13 @@ export function TraceVisualizer({
                     <span className="font-bold text-slate-800 dark:text-slate-200">
                       Raw Output:
                     </span>{' '}
-                    <span className="text-green-600 dark:text-green-400">{cf.output}</span>
+                    <span
+                      className="cursor-pointer text-green-600 hover:underline dark:text-green-400"
+                      onClick={() => handleCopyValue(cf.output || '', 'Raw Output')}
+                      title="Click to copy"
+                    >
+                      {cf.output}
+                    </span>
                   </div>
                 )}
               </>
@@ -551,10 +583,16 @@ export function TraceVisualizer({
                   {childPrefix}├─
                 </span>{' '}
                 <span className="font-bold text-slate-800 dark:text-slate-200">Output:</span>{' '}
-                <span className="text-green-600 dark:text-green-400">
-                  {cf.output.length <= 66
+                <span
+                  className="cursor-pointer text-green-600 hover:underline dark:text-green-400"
+                  onClick={() => handleCopyValue(cf.output || '', 'Output')}
+                  title="Click to copy"
+                >
+                  {cf.output && cf.output.length <= 66
                     ? cf.output
-                    : `${cf.output.slice(0, 66)}... (${cf.output.length} bytes)`}
+                    : cf.output
+                      ? `${cf.output.slice(0, 66)}... (${cf.output.length} bytes)`
+                      : ''}
                 </span>
               </div>
             )}
@@ -569,7 +607,11 @@ export function TraceVisualizer({
               {childPrefix}├─
             </span>{' '}
             <span className="font-bold text-slate-800 dark:text-slate-200">Input Selector:</span>{' '}
-            <span className="font-mono text-slate-800 dark:text-slate-100">
+            <span
+              className="cursor-pointer font-mono text-slate-800 hover:underline dark:text-slate-100"
+              onClick={() => handleCopyValue(cf.input.slice(0, 10), 'Input Selector')}
+              title="Click to copy"
+            >
               {cf.input.slice(0, 10)}
             </span>
           </div>
