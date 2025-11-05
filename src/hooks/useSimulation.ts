@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { SimulationService } from '@/lib/simulation-service'
-import type { SimulationRequest, UseSimulationOptions, UseSimulationReturn } from './types'
+import type {
+  SimulationRequest,
+  SimulationProgress,
+  UseSimulationOptions,
+  UseSimulationReturn,
+} from './types'
 import type { SimulationResult } from '@/lib/types'
 
 /**
@@ -39,6 +44,7 @@ import type { SimulationResult } from '@/lib/types'
 export function useSimulation(options?: UseSimulationOptions): UseSimulationReturn {
   const [result, setResult] = useState<SimulationResult | null>(null)
   const [isSimulating, setIsSimulating] = useState(false)
+  const [progress, setProgress] = useState<SimulationProgress | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
   // Cache service instance to avoid re-creation on every simulation
@@ -50,6 +56,7 @@ export function useSimulation(options?: UseSimulationOptions): UseSimulationRetu
       setIsSimulating(true)
       setResult(null)
       setError(null)
+      setProgress(null)
 
       try {
         // Create or reuse service instance
@@ -66,6 +73,11 @@ export function useSimulation(options?: UseSimulationOptions): UseSimulationRetu
           apiEtherscanUrl: params.apiEtherscanUrl,
           etherscanUrl: params.etherscanUrl,
           etherscanApiKey: params.etherscanApiKey,
+          onProgress: (step, totalSteps, message) => {
+            const progressData = { step, totalSteps, message }
+            setProgress(progressData)
+            options?.onProgress?.(progressData)
+          },
         })
 
         setResult(simulationResult)
@@ -112,12 +124,14 @@ export function useSimulation(options?: UseSimulationOptions): UseSimulationRetu
     setResult(null)
     setError(null)
     setIsSimulating(false)
+    setProgress(null)
   }, [])
 
   return {
     simulate,
     result,
     isSimulating,
+    progress,
     error,
     reset,
   }

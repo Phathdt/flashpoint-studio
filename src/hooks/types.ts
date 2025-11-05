@@ -16,15 +16,23 @@ export interface SimulationRequest {
   etherscanApiKey?: string
 }
 
+export interface SimulationProgress {
+  step: number
+  totalSteps: number
+  message: string
+}
+
 export interface UseSimulationOptions {
   onSuccess?: (result: SimulationResult) => void
   onError?: (error: Error) => void
+  onProgress?: (progress: SimulationProgress) => void
 }
 
 export interface UseSimulationReturn {
   simulate: (params: SimulationRequest) => Promise<void>
   result: SimulationResult | null
   isSimulating: boolean
+  progress: SimulationProgress | null
   error: Error | null
   reset: () => void
 }

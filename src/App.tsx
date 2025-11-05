@@ -11,6 +11,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { ShareModal } from '@/components/ShareModal'
 import { Settings } from '@/components/Settings'
+import { SimulationProgress } from '@/components/SimulationProgress'
 import {
   useSimulation,
   useShareTransaction,
@@ -85,7 +86,7 @@ function App() {
   } = form
 
   // Custom hooks for business logic
-  const { simulate, result: simulationResult, isSimulating } = useSimulation()
+  const { simulate, result: simulationResult, isSimulating, progress } = useSimulation()
 
   const { share, isSharing, shareUrl, privateBinUrl } = useShareTransaction({
     onSuccess: () => setShareModalOpen(true),
@@ -314,6 +315,9 @@ function App() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Progress indicator during simulation */}
+          {isSimulating && progress && <SimulationProgress progress={progress} />}
 
           {result && (
             <Card>

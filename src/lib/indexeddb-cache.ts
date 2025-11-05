@@ -22,6 +22,7 @@ interface CacheEntry<T> {
   value: T
   timestamp: number
   chainId?: number
+  notFound?: boolean // Flag to indicate "not found" result
 }
 
 export class IndexedDBCache {
@@ -93,6 +94,7 @@ export class IndexedDBCache {
 
   /**
    * Get ABI from cache
+   * @returns ABI array if found, empty array if cached as "not found", null if not in cache
    */
   async getAbi(address: string, chainId?: number): Promise<any[] | null> {
     try {
@@ -123,8 +125,14 @@ export class IndexedDBCache {
             return
           }
 
-          console.debug(`Cache hit for ABI ${address}`)
-          resolve(entry.value)
+          // Return empty array for "not found" entries
+          if (entry.notFound) {
+            console.debug(`Cache hit for ABI ${address} (not found)`)
+            resolve([])
+          } else {
+            console.debug(`Cache hit for ABI ${address}`)
+            resolve(entry.value)
+          }
         }
 
         request.onerror = () => {
@@ -140,6 +148,7 @@ export class IndexedDBCache {
 
   /**
    * Set ABI in cache
+   * @param abi ABI array, or empty array to mark as "not found"
    */
   async setAbi(address: string, abi: any[], chainId?: number): Promise<void> {
     try {
@@ -151,6 +160,7 @@ export class IndexedDBCache {
         value: abi,
         timestamp: Date.now(),
         chainId,
+        notFound: abi.length === 0, // Mark as "not found" if empty array
       }
 
       return new Promise((resolve, reject) => {
@@ -159,7 +169,11 @@ export class IndexedDBCache {
         const request = store.put(entry)
 
         request.onsuccess = () => {
-          console.debug(`Cached ABI for ${address}`)
+          if (entry.notFound) {
+            console.debug(`Cached ABI for ${address} (not found)`)
+          } else {
+            console.debug(`Cached ABI for ${address}`)
+          }
           resolve()
         }
 
@@ -196,6 +210,7 @@ export class IndexedDBCache {
 
   /**
    * Get contract name from cache
+   * @returns Contract name if found, empty string if cached as "not found", null if not in cache
    */
   async getContractName(address: string, chainId?: number): Promise<string | null> {
     try {
@@ -226,8 +241,14 @@ export class IndexedDBCache {
             return
           }
 
-          console.debug(`Cache hit for contract name ${address}`)
-          resolve(entry.value)
+          // Return empty string for "not found" entries
+          if (entry.notFound) {
+            console.debug(`Cache hit for contract name ${address} (not found)`)
+            resolve('')
+          } else {
+            console.debug(`Cache hit for contract name ${address}`)
+            resolve(entry.value)
+          }
         }
 
         request.onerror = () => {
@@ -243,6 +264,7 @@ export class IndexedDBCache {
 
   /**
    * Set contract name in cache
+   * @param name Contract name, or empty string to mark as "not found"
    */
   async setContractName(address: string, name: string, chainId?: number): Promise<void> {
     try {
@@ -254,6 +276,7 @@ export class IndexedDBCache {
         value: name,
         timestamp: Date.now(),
         chainId,
+        notFound: name === '', // Mark as "not found" if empty string
       }
 
       return new Promise((resolve, reject) => {
@@ -262,7 +285,11 @@ export class IndexedDBCache {
         const request = store.put(entry)
 
         request.onsuccess = () => {
-          console.debug(`Cached contract name for ${address}`)
+          if (entry.notFound) {
+            console.debug(`Cached contract name for ${address} (not found)`)
+          } else {
+            console.debug(`Cached contract name for ${address}`)
+          }
           resolve()
         }
 
