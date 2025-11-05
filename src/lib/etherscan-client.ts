@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getCache } from './indexeddb-cache'
+import { RateLimiter } from './rate-limiter'
 
 export interface EtherscanConfig {
   apiKey: string
@@ -18,11 +19,14 @@ export interface EtherscanConfig {
 export class EtherscanClient {
   private config: EtherscanConfig
   private isV2Api: boolean
+  private rateLimiter: RateLimiter
 
   constructor(config: EtherscanConfig) {
     this.config = config
     // Detect if using Etherscan API v2 (unified endpoint)
     this.isV2Api = config.apiUrl.includes('/v2/api')
+    // Initialize rate limiter: 4 requests per second (safe margin below 5/sec limit)
+    this.rateLimiter = new RateLimiter(4)
   }
 
   /**
@@ -62,11 +66,16 @@ export class EtherscanClient {
 
       // Use proxy to avoid CORS issues
       const proxyUrl = `/api/etherscan${url.pathname}${url.search}`
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'x-target-url': url.toString(),
-        },
-      })
+
+      // Apply rate limiting before making the request
+      const response = await this.rateLimiter.execute(() =>
+        fetch(proxyUrl, {
+          headers: {
+            'x-target-url': url.toString(),
+          },
+        })
+      )
+
       const data = (await response.json()) as {
         status: string
         result?: string
@@ -80,7 +89,9 @@ export class EtherscanClient {
         console.log(`✓ Fetched ABI for ${address}`)
         return abi
       } else {
+        // Cache "not found" result to avoid repeated requests
         console.debug(`No ABI found for ${address}: ${data.message || 'Unknown error'}`)
+        await cache.setAbi(cacheKey, [], this.config.chainId)
         return null
       }
     } catch (error) {
@@ -104,9 +115,14 @@ export class EtherscanClient {
 
     for (const address of uniqueAddresses) {
       const cachedAbi = await cache.getAbi(address, this.config.chainId)
-      if (cachedAbi) {
-        abiMap.set(address, cachedAbi)
+      if (cachedAbi !== null) {
+        // cachedAbi is either a valid ABI array or empty array (not found)
+        if (cachedAbi.length > 0) {
+          abiMap.set(address, cachedAbi)
+        }
+        // Skip fetching for both found and "not found" cached results
       } else {
+        // null means not in cache, need to fetch
         addressesToFetch.push(address)
       }
     }
@@ -124,32 +140,17 @@ export class EtherscanClient {
       `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${cachedCount} cached)...`
     )
 
-    // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
-    const batchSize = 5
-    const batches: string[][] = []
+    // Fetch all addresses with rate limiting handled by RateLimiter
+    const results = await Promise.all(
+      addressesToFetch.map((address) => this.fetchContractAbi(address))
+    )
 
-    for (let i = 0; i < addressesToFetch.length; i += batchSize) {
-      batches.push(addressesToFetch.slice(i, i + batchSize))
-    }
-
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i]
-
-      // Fetch all addresses in this batch in parallel
-      const results = await Promise.all(batch.map((address) => this.fetchContractAbi(address)))
-
-      // Add successful results to map
-      results.forEach((abi, index) => {
-        if (abi) {
-          abiMap.set(batch[index], abi)
-        }
-      })
-
-      // Rate limiting: wait 1 second between batches (except for last batch)
-      if (i < batches.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Add successful results to map
+    results.forEach((abi, index) => {
+      if (abi) {
+        abiMap.set(addressesToFetch[index], abi)
       }
-    }
+    })
 
     console.log(`✓ Fetched ${abiMap.size} ABI(s) from Explorer API`)
     return abiMap
@@ -215,11 +216,16 @@ export class EtherscanClient {
 
       // Use proxy to avoid CORS issues
       const proxyUrl = `/api/etherscan${url.pathname}${url.search}`
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'x-target-url': url.toString(),
-        },
-      })
+
+      // Apply rate limiting before making the request
+      const response = await this.rateLimiter.execute(() =>
+        fetch(proxyUrl, {
+          headers: {
+            'x-target-url': url.toString(),
+          },
+        })
+      )
+
       const data = (await response.json()) as {
         status: string
         result?: Array<{ ContractName: string }>
@@ -236,6 +242,9 @@ export class EtherscanClient {
         }
       }
 
+      // Cache "not found" result to avoid repeated requests
+      console.debug(`No contract name found for ${address}`)
+      await cache.setContractName(cacheKey, '', this.config.chainId)
       return null
     } catch (error) {
       console.debug(`Failed to fetch contract name for ${address}:`, error)
@@ -258,9 +267,14 @@ export class EtherscanClient {
 
     for (const address of uniqueAddresses) {
       const cachedName = await cache.getContractName(address, this.config.chainId)
-      if (cachedName) {
-        nameMap.set(address, cachedName)
+      if (cachedName !== null) {
+        // cachedName is either a valid name or empty string (not found)
+        if (cachedName !== '') {
+          nameMap.set(address, cachedName)
+        }
+        // Skip fetching for both found and "not found" cached results
       } else {
+        // null means not in cache, need to fetch
         addressesToFetch.push(address)
       }
     }
@@ -278,32 +292,17 @@ export class EtherscanClient {
       `Fetching contract names for ${addressesToFetch.length} address(es) (${cachedCount} cached)...`
     )
 
-    // Parallel fetch with batching to respect rate limits (5 req/sec = batch of 5 every 1 second)
-    const batchSize = 5
-    const batches: string[][] = []
+    // Fetch all addresses with rate limiting handled by RateLimiter
+    const results = await Promise.all(
+      addressesToFetch.map((address) => this.fetchContractName(address))
+    )
 
-    for (let i = 0; i < addressesToFetch.length; i += batchSize) {
-      batches.push(addressesToFetch.slice(i, i + batchSize))
-    }
-
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i]
-
-      // Fetch all addresses in this batch in parallel
-      const results = await Promise.all(batch.map((address) => this.fetchContractName(address)))
-
-      // Add successful results to map
-      results.forEach((name, index) => {
-        if (name) {
-          nameMap.set(batch[index], name)
-        }
-      })
-
-      // Rate limiting: wait 1 second between batches (except for last batch)
-      if (i < batches.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Add successful results to map
+    results.forEach((name, index) => {
+      if (name) {
+        nameMap.set(addressesToFetch[index], name)
       }
-    }
+    })
 
     console.log(`✓ Fetched ${nameMap.size} contract name(s)`)
     return nameMap

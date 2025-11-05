@@ -19,7 +19,13 @@ export function TransferVisualizer({
 }: TransferVisualizerProps) {
   const { copyToClipboard } = useCopyToClipboard()
 
-  if (!transfers || transfers.length === 0) {
+  // Filter out UNKNOWN tokens
+  const filteredTransfers = transfers.filter((transfer) => {
+    const tokenSymbol = transfer.tokenSymbol || 'UNKNOWN'
+    return tokenSymbol !== 'UNKNOWN'
+  })
+
+  if (!filteredTransfers || filteredTransfers.length === 0) {
     return null
   }
 
@@ -57,7 +63,7 @@ export function TransferVisualizer({
 
       {/* Transfers List */}
       <div className="divide-y divide-border">
-        {transfers.map((transfer, index) => {
+        {filteredTransfers.map((transfer, index) => {
           const isNative = transfer.type === 'native'
           const tokenSymbol = transfer.tokenSymbol || 'UNKNOWN'
           const tokenName = transfer.tokenName || 'Unknown Token'
@@ -186,13 +192,13 @@ export function TransferVisualizer({
       {/* Summary */}
       <div className="border-t-2 border-border bg-muted px-4 py-3 text-sm">
         <div className="text-center">
-          <span className="font-bold">Total Transfers:</span> {transfers.length}
+          <span className="font-bold">Total Transfers:</span> {filteredTransfers.length}
           <span className="mx-2 text-slate-400">•</span>
           <span className="font-bold">Native:</span>{' '}
-          {transfers.filter((t) => t.type === 'native').length}
+          {filteredTransfers.filter((t) => t.type === 'native').length}
           <span className="mx-2 text-slate-400">•</span>
           <span className="font-bold">ERC-20:</span>{' '}
-          {transfers.filter((t) => t.type === 'erc20').length}
+          {filteredTransfers.filter((t) => t.type === 'erc20').length}
         </div>
       </div>
     </div>

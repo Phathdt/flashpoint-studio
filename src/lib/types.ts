@@ -34,6 +34,7 @@ export interface SimulationRequest {
   apiEtherscanUrl?: string
   etherscanUrl?: string
   etherscanApiKey?: string
+  onProgress?: (step: number, totalSteps: number, message: string) => void
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -15,11 +15,19 @@ export class SimulationService {
    * Run a transaction simulation with optional tracing and ABI fetching
    */
   async simulate(request: SimulationRequest): Promise<SimulationResult> {
+    const TOTAL_STEPS = 7
+    const reportProgress = (step: number, message: string) => {
+      request.onProgress?.(step, TOTAL_STEPS, message)
+    }
+
     try {
       console.log('Starting EVM call simulation...')
       console.log(`RPC URL: ${request.rpcUrl}`)
       console.log(`Contract Address: ${request.toAddress}`)
       console.log(`From Address: ${request.fromAddress}`)
+
+      // Step 1: Validate inputs
+      reportProgress(1, 'Validating inputs...')
 
       // Validate addresses
       if (!ethers.isAddress(request.fromAddress)) {
@@ -34,12 +42,13 @@ export class SimulationService {
         throw new Error(`Invalid calldata: ${request.payload}`)
       }
 
+      // Step 2: Connect to network
+      reportProgress(2, 'Connecting to RPC...')
+
       // Create trace client
       const traceClient = new TraceClient(request.rpcUrl)
       const provider = traceClient.getProvider()
 
-      // Connect to network
-      console.log('Connecting to RPC...')
       const network = await provider.getNetwork()
       const chainId = Number(network.chainId)
       console.log(`✓ Connected to network: ${network.name} (Chain ID: ${chainId})`)
@@ -54,7 +63,8 @@ export class SimulationService {
         data: request.payload,
       }
 
-      console.log('Simulating transaction...')
+      // Step 3: Execute trace
+      reportProgress(3, 'Executing transaction trace...')
 
       // Determine Etherscan URL - use provided or auto-detect from chainId
       let etherscanUrl: string
@@ -121,7 +131,9 @@ export class SimulationService {
         console.log(`Found ${addresses.length} unique contract address(es)`)
 
         if (addresses.length > 0) {
-          console.log('Fetching ABIs and contract names from Etherscan...')
+          // Step 4: Fetch ABIs and contract names
+          reportProgress(4, 'Fetching contract ABIs and names...')
+
           const [abiMap, nameMap] = await Promise.all([
             etherscanClient.fetchMultipleAbis(addresses),
             etherscanClient.fetchMultipleContractNames(addresses),
@@ -138,14 +150,20 @@ export class SimulationService {
           contractNames = nameMap
         }
 
-        // Parse the trace
+        // Step 5: Parse the trace
+        reportProgress(5, 'Parsing transaction trace...')
+
         const traceParser = new TraceParser(functionDecoder)
         const { parsed, stats } = traceParser.parse(traceResult)
 
-        // Detect transfers in the trace
-        console.log('Detecting token transfers...')
+        // Step 6: Detect transfers
+        reportProgress(6, 'Detecting token transfers...')
+
         const transferDetector = new TransferDetector(provider, chainId)
         const { transfers, tokenMetadata } = await transferDetector.detectTransfers(parsed)
+
+        // Step 7: Complete
+        reportProgress(7, 'Simulation complete!')
 
         return {
           success: true,
