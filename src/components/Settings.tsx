@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useTheme } from '@/components/theme-provider'
+import { useTheme } from 'next-themes'
 
 export type ContainerSize = 'small' | 'medium' | 'large' | 'extra-large' | 'full'
 

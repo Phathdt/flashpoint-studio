@@ -185,7 +185,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
@@ -220,7 +220,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
@@ -247,7 +247,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
@@ -268,7 +268,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
@@ -288,7 +288,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
@@ -449,7 +449,7 @@ describe('useClipboardForm', () => {
       payload: '0x123',
     }
 
-    let copyPromise
+    let copyPromise: Promise<void>
     act(() => {
       copyPromise = result.current.copyToClipboard(formData)
     })
@@ -484,7 +484,7 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastePromise
+    let pastePromise: Promise<FormData | null>
     act(() => {
       pastePromise = result.current.pasteFromClipboard()
     })
@@ -513,13 +513,13 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
 
     expect(pastedData).not.toBeNull()
-    expect(pastedData?.rpcUrl).toBe('https://eth.llamarpc.com')
+    expect(pastedData!.rpcUrl).toBe('https://eth.llamarpc.com')
     expect(toast.success).toHaveBeenCalled()
   })
 
@@ -532,13 +532,13 @@ describe('useClipboardForm', () => {
 
     const { result } = renderHook(() => useClipboardForm())
 
-    let pastedData
+    let pastedData: FormData | null = null
     await act(async () => {
       pastedData = await result.current.pasteFromClipboard()
     })
 
     expect(pastedData).not.toBeNull()
-    expect(pastedData?.toAddress).toBe('0xdef')
+    expect(pastedData!.toAddress).toBe('0xdef')
     expect(toast.success).toHaveBeenCalled()
   })
 })
