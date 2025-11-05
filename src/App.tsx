@@ -314,8 +314,8 @@ function App() {
         shareUrl={shareUrl}
         privateBinUrl={privateBinUrl}
       />
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+      <div className="min-h-screen bg-background p-4 md:p-8">
+        <div className="max-w-full lg:max-w-7xl xl:max-w-screen-2xl mx-auto space-y-8 px-2 md:px-0">
           <div className="text-center space-y-2">
             <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
             <p className="text-muted-foreground">Debug and trace EVM transactions</p>
