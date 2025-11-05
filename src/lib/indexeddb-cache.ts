@@ -6,12 +6,16 @@
  */
 
 const DB_NAME = 'flashpoint-studio-cache'
-const DB_VERSION = 1
+const DB_VERSION = 2 // Incremented for token metadata store
 const STORE_ABIS = 'abis'
 const STORE_CONTRACT_NAMES = 'contract-names'
+const STORE_TOKEN_METADATA = 'token-metadata'
 
 // Cache expiration time: 7 days in milliseconds
 const CACHE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
+
+// Token metadata cache expiration: 30 days in milliseconds
+const TOKEN_METADATA_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000
 
 interface CacheEntry<T> {
   key: string
@@ -57,6 +61,12 @@ export class IndexedDBCache {
           const nameStore = db.createObjectStore(STORE_CONTRACT_NAMES, { keyPath: 'key' })
           nameStore.createIndex('timestamp', 'timestamp', { unique: false })
           nameStore.createIndex('chainId', 'chainId', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains(STORE_TOKEN_METADATA)) {
+          const tokenStore = db.createObjectStore(STORE_TOKEN_METADATA, { keyPath: 'key' })
+          tokenStore.createIndex('timestamp', 'timestamp', { unique: false })
+          tokenStore.createIndex('chainId', 'chainId', { unique: false })
         }
 
         console.log('IndexedDB schema upgraded to version', DB_VERSION)
@@ -288,6 +298,118 @@ export class IndexedDBCache {
   }
 
   /**
+   * Get token metadata from cache
+   */
+  async getTokenMetadata(
+    address: string,
+    chainId?: number
+  ): Promise<{ name: string; symbol: string; decimals: number } | null> {
+    try {
+      const db = await this.getDB()
+      const key = this.getCacheKey(address, chainId)
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_TOKEN_METADATA, 'readonly')
+        const store = transaction.objectStore(STORE_TOKEN_METADATA)
+        const request = store.get(key)
+
+        request.onsuccess = () => {
+          const entry = request.result as
+            | CacheEntry<{ name: string; symbol: string; decimals: number }>
+            | undefined
+
+          if (!entry) {
+            resolve(null)
+            return
+          }
+
+          // Check if expired (30 days for token metadata)
+          if (Date.now() - entry.timestamp > TOKEN_METADATA_EXPIRATION_MS) {
+            console.debug(`Cache expired for token metadata ${address}`)
+            // Delete expired entry asynchronously
+            this.deleteTokenMetadata(address, chainId).catch(() => {
+              /* ignore */
+            })
+            resolve(null)
+            return
+          }
+
+          console.debug(`Cache hit for token metadata ${address}`)
+          resolve(entry.value)
+        }
+
+        request.onerror = () => {
+          console.warn('Failed to get token metadata from cache:', request.error)
+          reject(request.error)
+        }
+      })
+    } catch (error) {
+      console.warn('IndexedDB cache error:', error)
+      return null
+    }
+  }
+
+  /**
+   * Set token metadata in cache
+   */
+  async setTokenMetadata(
+    address: string,
+    metadata: { name: string; symbol: string; decimals: number },
+    chainId?: number
+  ): Promise<void> {
+    try {
+      const db = await this.getDB()
+      const key = this.getCacheKey(address, chainId)
+
+      const entry: CacheEntry<{ name: string; symbol: string; decimals: number }> = {
+        key,
+        value: metadata,
+        timestamp: Date.now(),
+        chainId,
+      }
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_TOKEN_METADATA, 'readwrite')
+        const store = transaction.objectStore(STORE_TOKEN_METADATA)
+        const request = store.put(entry)
+
+        request.onsuccess = () => {
+          console.debug(`Cached token metadata for ${address}`)
+          resolve()
+        }
+
+        request.onerror = () => {
+          console.warn('Failed to cache token metadata:', request.error)
+          reject(request.error)
+        }
+      })
+    } catch (error) {
+      console.warn('IndexedDB cache error:', error)
+    }
+  }
+
+  /**
+   * Delete token metadata from cache
+   */
+  async deleteTokenMetadata(address: string, chainId?: number): Promise<void> {
+    try {
+      const db = await this.getDB()
+      const key = this.getCacheKey(address, chainId)
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_TOKEN_METADATA, 'readwrite')
+        const store = transaction.objectStore(STORE_TOKEN_METADATA)
+        const request = store.delete(key)
+
+        request.onsuccess = () => resolve()
+        request.onerror = () => reject(request.error)
+      })
+    } catch (error) {
+      console.warn('IndexedDB cache error:', error)
+    }
+  }
+
+  /**
    * Clear all expired entries from cache
    */
   async clearExpired(): Promise<void> {
@@ -295,6 +417,7 @@ export class IndexedDBCache {
       const db = await this.getDB()
       const now = Date.now()
       const expirationThreshold = now - CACHE_EXPIRATION_MS
+      const tokenExpirationThreshold = now - TOKEN_METADATA_EXPIRATION_MS
 
       // Clear expired ABIs
       await new Promise<void>((resolve, reject) => {
@@ -338,6 +461,27 @@ export class IndexedDBCache {
         request.onerror = () => reject(request.error)
       })
 
+      // Clear expired token metadata
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORE_TOKEN_METADATA, 'readwrite')
+        const store = transaction.objectStore(STORE_TOKEN_METADATA)
+        const index = store.index('timestamp')
+        const range = IDBKeyRange.upperBound(tokenExpirationThreshold)
+        const request = index.openCursor(range)
+
+        request.onsuccess = () => {
+          const cursor = request.result
+          if (cursor) {
+            cursor.delete()
+            cursor.continue()
+          } else {
+            resolve()
+          }
+        }
+
+        request.onerror = () => reject(request.error)
+      })
+
       console.log('Cleared expired cache entries')
     } catch (error) {
       console.warn('Failed to clear expired cache:', error)
@@ -352,12 +496,17 @@ export class IndexedDBCache {
       const db = await this.getDB()
 
       await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction([STORE_ABIS, STORE_CONTRACT_NAMES], 'readwrite')
+        const transaction = db.transaction(
+          [STORE_ABIS, STORE_CONTRACT_NAMES, STORE_TOKEN_METADATA],
+          'readwrite'
+        )
         const abiStore = transaction.objectStore(STORE_ABIS)
         const nameStore = transaction.objectStore(STORE_CONTRACT_NAMES)
+        const tokenStore = transaction.objectStore(STORE_TOKEN_METADATA)
 
         const abiRequest = abiStore.clear()
         const nameRequest = nameStore.clear()
+        const tokenRequest = tokenStore.clear()
 
         transaction.oncomplete = () => {
           console.log('Cleared all cache data')
@@ -370,6 +519,7 @@ export class IndexedDBCache {
 
         abiRequest.onerror = () => reject(abiRequest.error)
         nameRequest.onerror = () => reject(nameRequest.error)
+        tokenRequest.onerror = () => reject(tokenRequest.error)
       })
     } catch (error) {
       console.warn('Failed to clear cache:', error)

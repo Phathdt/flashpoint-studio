@@ -39,6 +39,32 @@ export interface SimulationRequest {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
+ * Represents a token or ETH transfer detected in trace
+ */
+export interface TokenTransfer {
+  type: 'erc20' | 'native'
+  from: string
+  to: string
+  amount: bigint
+  tokenAddress?: string // Contract address for ERC-20
+  tokenName?: string
+  tokenSymbol?: string
+  tokenDecimals?: number
+  formattedAmount?: string
+  callFrameIndex?: number
+}
+
+/**
+ * Token metadata from ERC-20 contract
+ */
+export interface TokenMetadata {
+  address: string
+  name: string
+  symbol: string
+  decimals: number
+}
+
+/**
  * Simulation result
  */
 export interface SimulationResult {
@@ -51,6 +77,8 @@ export interface SimulationResult {
   contractNames?: Map<string, string>
   chainId?: number
   etherscanUrl?: string
+  allTransfers?: TokenTransfer[]
+  tokenMetadata?: Map<string, TokenMetadata>
   error?: string
   errorDetails?: {
     type: string

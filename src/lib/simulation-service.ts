@@ -3,6 +3,7 @@ import { TraceClient } from './trace-client'
 import { EtherscanClient } from './etherscan-client'
 import { FunctionDecoder } from './function-decoder'
 import { TraceParser } from './trace-parser'
+import { TransferDetector } from './transfer-detector'
 import { getEtherscanUrl } from './etherscan-utils'
 import type { SimulationRequest, SimulationResult } from './types'
 
@@ -141,6 +142,11 @@ export class SimulationService {
         const traceParser = new TraceParser(functionDecoder)
         const { parsed, stats } = traceParser.parse(traceResult)
 
+        // Detect transfers in the trace
+        console.log('Detecting token transfers...')
+        const transferDetector = new TransferDetector(provider, chainId)
+        const { transfers, tokenMetadata } = await transferDetector.detectTransfers(parsed)
+
         return {
           success: true,
           trace: traceResult,
@@ -148,6 +154,8 @@ export class SimulationService {
           contractNames,
           chainId,
           etherscanUrl,
+          allTransfers: transfers,
+          tokenMetadata,
         }
       } else {
         // Fallback to standard call if tracing not supported

@@ -5,6 +5,7 @@
 
 import { PrivatebinClient } from '@pixelfactory/privatebin'
 import bs58 from 'bs58'
+import type { TokenTransfer, TokenMetadata } from './types'
 
 export interface ShareableData {
   // Transaction inputs
@@ -30,6 +31,8 @@ export interface ShareableData {
     contractNames?: Record<string, string> // Convert Map to object for JSON serialization
     chainId?: number // Use chainId to identify network instead of RPC URL
     etherscanUrl?: string // Public etherscan URL is safe to share
+    allTransfers?: TokenTransfer[] // Balance changes
+    tokenMetadata?: Record<string, TokenMetadata> // Convert Map to object for JSON serialization
     error?: string
     errorDetails?: {
       type: string

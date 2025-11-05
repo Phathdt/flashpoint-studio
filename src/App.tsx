@@ -339,6 +339,8 @@ function App() {
                         contractNames={result.contractNames}
                         chainId={result.chainId}
                         etherscanUrl={result.etherscanUrl}
+                        allTransfers={result.allTransfers}
+                        tokenMetadata={result.tokenMetadata}
                       />
                     ) : result.trace ? (
                       <div className="space-y-2">
