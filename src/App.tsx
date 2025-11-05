@@ -14,7 +14,8 @@ import type { SimulationResult } from '@/lib/types'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { PrivateBinShareClient } from '@/lib/privatebin-client'
 import { ShareModal } from '@/components/ShareModal'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { Settings, type ContainerSize } from '@/components/Settings'
+import { getContainerWidthClass } from '@/lib/container-size'
 
 const evmTracingSchema = z.object({
   rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
@@ -70,6 +71,7 @@ function App() {
   const [shareUrl, setShareUrl] = useState('')
   const [privateBinUrl, setPrivateBinUrl] = useState('')
   const [isSharing, setIsSharing] = useState(false)
+  const [containerSize, setContainerSize] = useState<ContainerSize>('large')
 
   const form = useForm<EVMTracingFormData>({
     resolver: zodResolver(evmTracingSchema),
@@ -307,15 +309,15 @@ function App() {
   return (
     <>
       <Toaster />
-      <ThemeToggle />
+      <Settings onSizeChange={setContainerSize} />
       <ShareModal
         open={shareModalOpen}
         onOpenChange={setShareModalOpen}
         shareUrl={shareUrl}
         privateBinUrl={privateBinUrl}
       />
-      <div className="min-h-screen bg-background p-4 md:p-8">
-        <div className="max-w-full lg:max-w-7xl xl:max-w-screen-2xl mx-auto space-y-8 px-2 md:px-0">
+      <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
+        <div className={`mx-auto space-y-8 ${getContainerWidthClass(containerSize)}`}>
           <div className="text-center space-y-2">
             <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
             <p className="text-muted-foreground">Debug and trace EVM transactions</p>
