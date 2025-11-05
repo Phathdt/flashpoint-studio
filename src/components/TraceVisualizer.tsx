@@ -1,5 +1,5 @@
 import type { ParsedCallFrame, TraceStats } from '@/lib/trace-parser'
-import { getAddressUrl } from '@/lib/etherscan-utils'
+import { getAddressUrl, getNetworkName } from '@/lib/etherscan-utils'
 import { toast } from 'sonner'
 
 interface TraceVisualizerProps {
@@ -642,6 +642,23 @@ export function TraceVisualizer({
       {/* Header */}
       <div className="border-b-2 border-border pb-2">
         <h3 className="text-center text-xl font-bold">TRANSACTION TRACE</h3>
+      </div>
+
+      {/* Network Information */}
+      <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
+        <div className="flex items-center justify-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700 dark:text-slate-200">Network:</span>
+            <span className="font-medium text-blue-700 dark:text-blue-300">
+              {getNetworkName(chainId)}
+            </span>
+          </div>
+          <span className="text-slate-400">•</span>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700 dark:text-slate-200">Chain ID:</span>
+            <span className="font-mono text-blue-700 dark:text-blue-300">{chainId}</span>
+          </div>
+        </div>
       </div>
 
       {/* Trace tree */}

@@ -1,21 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { toast } from 'sonner'
 import { Share2, Copy, ClipboardPaste } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Toaster } from '@/components/ui/sonner'
-import { SimulationService } from '@/lib/simulation-service'
-import type { SimulationResult } from '@/lib/types'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
-import { PrivateBinShareClient } from '@/lib/privatebin-client'
 import { ShareModal } from '@/components/ShareModal'
-import { Settings, type ContainerSize } from '@/components/Settings'
-import { getContainerWidthClass } from '@/lib/container-size'
+import { Settings } from '@/components/Settings'
+import {
+  useSimulation,
+  useShareTransaction,
+  useLoadSharedTransaction,
+  useClipboardForm,
+  useContainerSize,
+} from '@/hooks'
 
 const evmTracingSchema = z.object({
   rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
@@ -65,14 +67,10 @@ const evmTracingSchema = z.object({
 type EVMTracingFormData = z.infer<typeof evmTracingSchema>
 
 function App() {
-  const [isSimulating, setIsSimulating] = useState(false)
-  const [result, setResult] = useState<SimulationResult | null>(null)
+  // Modal state
   const [shareModalOpen, setShareModalOpen] = useState(false)
-  const [shareUrl, setShareUrl] = useState('')
-  const [privateBinUrl, setPrivateBinUrl] = useState('')
-  const [isSharing, setIsSharing] = useState(false)
-  const [containerSize, setContainerSize] = useState<ContainerSize>('large')
 
+  // Form setup
   const form = useForm<EVMTracingFormData>({
     resolver: zodResolver(evmTracingSchema),
     defaultValues: {},
@@ -86,224 +84,89 @@ function App() {
     getValues,
   } = form
 
-  // Load data from URL parameter on mount
-  useEffect(() => {
-    const loadFromPrivateBin = async () => {
-      const privatebinClient = new PrivateBinShareClient()
-      const shareUrl = privatebinClient.getShareUrlFromParams()
+  // Custom hooks for business logic
+  const { simulate, result: simulationResult, isSimulating } = useSimulation()
 
-      if (shareUrl) {
-        try {
-          toast.info('Loading shared transaction data...')
-          const data = await privatebinClient.fetchPaste(shareUrl)
+  const { share, isSharing, shareUrl, privateBinUrl } = useShareTransaction({
+    onSuccess: () => setShareModalOpen(true),
+  })
 
-          // Populate form fields (rpcUrl is not shared for security reasons)
-          if (data.payload) setValue('payload', data.payload)
-          if (data.fromAddress) setValue('fromAddress', data.fromAddress)
-          if (data.toAddress) setValue('toAddress', data.toAddress)
+  const { simulationResult: loadedSimulationResult } = useLoadSharedTransaction({
+    onSuccess: (data) => {
+      // Auto-populate form with loaded data
+      if (data.payload) setValue('payload', data.payload)
+      if (data.fromAddress) setValue('fromAddress', data.fromAddress)
+      if (data.toAddress) setValue('toAddress', data.toAddress)
+      if (data.blockNumber) setValue('blockNumber', data.blockNumber)
+      if (data.apiEtherscanUrl) setValue('apiEtherscanUrl', data.apiEtherscanUrl)
+      if (data.etherscanUrl) setValue('etherscanUrl', data.etherscanUrl)
+      // Note: etherscanApiKey is not loaded from shared links (not shared for security)
+    },
+  })
 
-          // Restore simulation result if available
-          if (data.simulationResult) {
-            const restoredResult: SimulationResult = {
-              success: data.simulationResult.success,
-              trace: data.simulationResult.trace,
-              parsedTrace: data.simulationResult.parsedTrace,
-              contractNames: data.simulationResult.contractNames
-                ? new Map(Object.entries(data.simulationResult.contractNames))
-                : undefined,
-              chainId: data.simulationResult.chainId,
-              etherscanUrl: data.simulationResult.etherscanUrl,
-              error: data.simulationResult.error,
-              errorDetails: data.simulationResult.errorDetails,
-            }
-            setResult(restoredResult)
+  const { copyToClipboard, pasteFromClipboard } = useClipboardForm({
+    onPasteSuccess: (data) => {
+      // Auto-populate form with pasted data
+      if (data.rpcUrl) setValue('rpcUrl', data.rpcUrl)
+      if (data.fromAddress) setValue('fromAddress', data.fromAddress)
+      if (data.toAddress) setValue('toAddress', data.toAddress)
+      if (data.payload) setValue('payload', data.payload)
+      if (data.blockNumber) setValue('blockNumber', data.blockNumber)
+      if (data.apiEtherscanUrl) setValue('apiEtherscanUrl', data.apiEtherscanUrl)
+      if (data.etherscanUrl) setValue('etherscanUrl', data.etherscanUrl)
+      if (data.etherscanApiKey) setValue('etherscanApiKey', data.etherscanApiKey)
+    },
+  })
 
-            const resultMsg = restoredResult.success
-              ? 'Transaction data and simulation results loaded!'
-              : 'Transaction data loaded (simulation failed)'
+  const { setContainerSize, containerWidthClass } = useContainerSize()
 
-            toast.success(resultMsg)
-          } else {
-            toast.success('Transaction data loaded successfully')
-          }
-        } catch (error) {
-          console.error('Failed to load from PrivateBin:', error)
-          toast.error('Failed to load shared data', {
-            description: error instanceof Error ? error.message : 'Unknown error',
-          })
-        }
-      }
-    }
+  // Use loaded simulation result if available, otherwise use current simulation result
+  const result = simulationResult || loadedSimulationResult
 
-    loadFromPrivateBin()
-  }, [setValue])
-
+  // Form handlers
   const onSimulate: SubmitHandler<EVMTracingFormData> = async (data) => {
-    console.log('Simulating with data:', data)
-    setIsSimulating(true)
-    setResult(null)
-
-    try {
-      const simulationService = new SimulationService()
-      const simulationResult = await simulationService.simulate({
-        rpcUrl: data.rpcUrl,
-        payload: data.payload,
-        fromAddress: data.fromAddress,
-        toAddress: data.toAddress,
-        blockNumber: data.blockNumber,
-        apiEtherscanUrl: data.apiEtherscanUrl,
-        etherscanUrl: data.etherscanUrl,
-        etherscanApiKey: data.etherscanApiKey,
-      })
-
-      setResult(simulationResult)
-
-      // Show toast notification based on result
-      if (simulationResult.success) {
-        toast.success('Simulation Successful', {
-          description: 'Transaction simulation completed successfully',
-        })
-      } else {
-        toast.error('Simulation Failed', {
-          description: simulationResult.error || 'An unknown error occurred',
-        })
-      }
-    } catch (error) {
-      console.error('Simulation error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      toast.error('Simulation Failed', {
-        description: errorMessage,
-      })
-      setResult({
-        success: false,
-        error: errorMessage,
-      })
-    } finally {
-      setIsSimulating(false)
-    }
+    await simulate({
+      rpcUrl: data.rpcUrl,
+      payload: data.payload,
+      fromAddress: data.fromAddress,
+      toAddress: data.toAddress,
+      blockNumber: data.blockNumber,
+      apiEtherscanUrl: data.apiEtherscanUrl,
+      etherscanUrl: data.etherscanUrl,
+      etherscanApiKey: data.etherscanApiKey,
+    })
   }
 
   const onShare = async () => {
     const values = getValues()
-
-    // Validate required fields for sharing
-    if (!values.payload || !values.fromAddress || !values.toAddress) {
-      toast.error('Missing required fields', {
-        description: 'Please fill in payload, from address, and to address before sharing',
-      })
-      return
-    }
-
-    setIsSharing(true)
-
-    try {
-      const privatebinClient = new PrivateBinShareClient()
-
-      // Prepare simulation result data (if available)
-      let simulationResultData
-      if (result) {
-        simulationResultData = {
-          success: result.success,
-          trace: result.trace,
-          parsedTrace: result.parsedTrace,
-          contractNames: result.contractNames
-            ? Object.fromEntries(result.contractNames)
-            : undefined,
-          chainId: result.chainId,
-          etherscanUrl: result.etherscanUrl,
-          error: result.error,
-          errorDetails: result.errorDetails,
-        }
-      }
-
-      const privatebinResponse = await privatebinClient.createPaste({
-        payload: values.payload,
-        fromAddress: values.fromAddress,
-        toAddress: values.toAddress,
-        simulationResult: simulationResultData,
-        // Note: rpcUrl is intentionally excluded for security (may contain API keys)
-      })
-
-      // Generate both URLs
-      const url = privatebinClient.generateShareableUrl(privatebinResponse.url)
-      const pbUrl = privatebinClient.getPrivateBinUrl(privatebinResponse.url)
-
-      setShareUrl(url)
-      setPrivateBinUrl(pbUrl)
-      setShareModalOpen(true)
-
-      const description = result
-        ? 'Link includes transaction data and simulation results'
-        : 'Link includes transaction data (simulate first to include results)'
-
-      toast.success('Share link created!', {
-        description,
-      })
-    } catch (error) {
-      console.error('Failed to create share link:', error)
-      toast.error('Failed to create share link', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    } finally {
-      setIsSharing(false)
-    }
+    await share({
+      payload: values.payload,
+      fromAddress: values.fromAddress,
+      toAddress: values.toAddress,
+      blockNumber: values.blockNumber,
+      apiEtherscanUrl: values.apiEtherscanUrl,
+      etherscanUrl: values.etherscanUrl,
+      etherscanApiKey: values.etherscanApiKey,
+      result: simulationResult || undefined,
+    })
   }
 
   const onCopyToClipboard = async () => {
     const values = getValues()
-
-    // Copy all form data to clipboard as JSON
-    const formData = {
+    await copyToClipboard({
       rpcUrl: values.rpcUrl || '',
+      payload: values.payload || '',
       fromAddress: values.fromAddress || '',
       toAddress: values.toAddress || '',
-      payload: values.payload || '',
-      blockNumber: values.blockNumber || '',
-      apiEtherscanUrl: values.apiEtherscanUrl || '',
-      etherscanUrl: values.etherscanUrl || '',
-      etherscanApiKey: values.etherscanApiKey || '',
-    }
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(formData, null, 2))
-      toast.success('Copied to clipboard!', {
-        description: 'Form data has been copied',
-      })
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error)
-      toast.error('Failed to copy', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    }
+      blockNumber: values.blockNumber,
+      apiEtherscanUrl: values.apiEtherscanUrl,
+      etherscanUrl: values.etherscanUrl,
+      etherscanApiKey: values.etherscanApiKey,
+    })
   }
 
   const onPasteFromClipboard = async () => {
-    try {
-      const clipboardText = await navigator.clipboard.readText()
-      const formData = JSON.parse(clipboardText) as Partial<EVMTracingFormData>
-
-      // Set each field if it exists in the clipboard data
-      if (formData.rpcUrl !== undefined) setValue('rpcUrl', formData.rpcUrl)
-      if (formData.fromAddress !== undefined) setValue('fromAddress', formData.fromAddress)
-      if (formData.toAddress !== undefined) setValue('toAddress', formData.toAddress)
-      if (formData.payload !== undefined) setValue('payload', formData.payload)
-      if (formData.blockNumber !== undefined) setValue('blockNumber', formData.blockNumber)
-      if (formData.apiEtherscanUrl !== undefined)
-        setValue('apiEtherscanUrl', formData.apiEtherscanUrl)
-      if (formData.etherscanUrl !== undefined) setValue('etherscanUrl', formData.etherscanUrl)
-      if (formData.etherscanApiKey !== undefined)
-        setValue('etherscanApiKey', formData.etherscanApiKey)
-
-      toast.success('Pasted from clipboard!', {
-        description: 'Form data has been restored',
-      })
-    } catch (error) {
-      console.error('Failed to paste from clipboard:', error)
-      toast.error('Failed to paste', {
-        description:
-          error instanceof Error ? error.message : 'Invalid clipboard data or permission denied',
-      })
-    }
+    await pasteFromClipboard()
   }
 
   return (
@@ -317,7 +180,7 @@ function App() {
         privateBinUrl={privateBinUrl}
       />
       <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
-        <div className={`mx-auto space-y-8 ${getContainerWidthClass(containerSize)}`}>
+        <div className={`mx-auto space-y-8 ${containerWidthClass}`}>
           <div className="text-center space-y-2">
             <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
             <p className="text-muted-foreground">Debug and trace EVM transactions</p>
