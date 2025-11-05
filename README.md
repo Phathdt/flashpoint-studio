@@ -5,9 +5,13 @@ A powerful web-based debugging and tracing tool for Ethereum Virtual Machine (EV
 ## ✨ Features
 
 - 🌐 **Direct RPC Communication**: Execute `debug_traceCall` directly from the browser using ethers.js
-- 🔍 **Transaction Tracing**: Comprehensive EVM transaction simulation and debugging
+- 🔍 **Transaction Tracing**: Comprehensive EVM transaction simulation and debugging with detailed call tree visualization
+- 📊 **Progress Tracking**: Real-time progress indicator showing simulation steps (7 stages from validation to completion)
 - 📦 **Automatic ABI Fetching**: Optional integration with Etherscan/Blockscout APIs to fetch contract ABIs and names
-- 💾 **Persistent Caching**: IndexedDB-based caching for ABIs and contract names (7-day expiration) to minimize API calls
+- 💾 **Persistent Caching**: IndexedDB-based caching for ABIs, contract names, and token metadata (7-day expiration) to minimize API calls
+- 🚫 **Negative Caching**: Cache "not found" results to avoid repeated failed API requests for unverified contracts
+- ⚡ **Rate Limiting**: Built-in token bucket rate limiter (4 req/sec) to prevent hitting API rate limits
+- 💰 **Balance Changes**: Automatic detection and visualization of token transfers (native & ERC-20) with filtering of unknown tokens
 - 🔐 **Share with PrivateBin**: Encrypted sharing of transaction configurations and results via PrivateBin (7-day expiration)
 - 📋 **Copy/Paste Form Data**: Copy all form inputs to clipboard as JSON and paste them back to quickly duplicate configurations
 - 👆 **Click-to-Copy Trace Values**: Click any parameter value in the trace visualization to copy it to clipboard (including full values for truncated displays)
@@ -66,31 +70,53 @@ pnpm format
 ```
 src/
 ├── 🧩 components/
-│   ├── 🎨 ui/                    # shadcn/ui components
-│   ├── 🔐 ShareModal.tsx         # Share link modal with copy buttons
-│   └── 📊 TraceVisualizer.tsx    # Transaction trace visualization
-├── 📚 lib/                       # Core services and utilities
-│   ├── 🔍 trace-client.ts        # RPC trace execution
-│   ├── 📦 etherscan-client.ts    # Contract ABI fetching with caching
-│   ├── 💾 indexeddb-cache.ts     # Persistent browser-side cache
-│   ├── 🔐 privatebin-client.ts   # PrivateBin encrypted sharing
-│   ├── ⚙️ simulation-service.ts  # Main orchestration service
-│   └── 📝 types.ts               # TypeScript type definitions
-├── 🪝 hooks/                     # Custom React hooks
-├── 🏠 App.tsx                    # Main application component
-└── 🚀 main.tsx                   # Application entry point
+│   ├── 🎨 ui/                       # shadcn/ui components
+│   ├── 🔐 ShareModal.tsx            # Share link modal with copy buttons
+│   ├── 📊 TraceVisualizer.tsx       # Transaction trace visualization
+│   ├── 💰 TransferVisualizer.tsx    # Balance changes visualization
+│   ├── ⚙️ Settings.tsx              # Settings panel for UI configuration
+│   └── 📈 SimulationProgress.tsx    # Progress indicator with step counter
+├── 📚 lib/                          # Core services and utilities
+│   ├── 🔍 trace-client.ts           # RPC trace execution
+│   ├── 📦 etherscan-client.ts       # Contract ABI fetching with rate limiting
+│   ├── 💾 indexeddb-cache.ts        # Persistent cache with negative caching
+│   ├── ⏱️ rate-limiter.ts           # Token bucket rate limiter
+│   ├── 🔐 privatebin-client.ts      # PrivateBin encrypted sharing
+│   ├── 💸 transfer-detector.ts      # Token transfer detection
+│   ├── 🪙 token-metadata-client.ts  # ERC-20 metadata fetching
+│   ├── ⚙️ simulation-service.ts     # Main orchestration service
+│   └── 📝 types.ts                  # TypeScript type definitions
+├── 🪝 hooks/                        # Custom React hooks
+├── 🏠 App.tsx                       # Main application component
+└── 🚀 main.tsx                      # Application entry point
 ```
 
 ## 🔄 How It Works
 
-1. 📝 **User Input**: Provide RPC URL, contract addresses, transaction payload, and optional Etherscan configuration
-2. 🎯 **Orchestration**: `SimulationService` coordinates the tracing process
-3. 🔍 **Simulation**: Transaction is simulated using `debug_traceCall` RPC method
-4. 📊 **Address Extraction**: Contract addresses are extracted from the trace
-5. 💾 **Cache Check**: System checks IndexedDB cache for previously fetched ABIs and contract names
-6. 🌐 **API Fetch**: Missing ABIs and contract names are fetched from Etherscan and cached for 7 days
-7. ✨ **Display Results**: Detailed trace information shown with decoded function calls
-8. 👆 **Click to Copy**: Click any parameter value in the trace to instantly copy it to your clipboard
+### Simulation Flow (7 Steps)
+
+1. 📝 **Validating Inputs**: Validate addresses, calldata format, and RPC connectivity
+2. 🌐 **Connecting to RPC**: Establish connection and detect network/chain ID
+3. 🔍 **Executing Transaction Trace**: Run `debug_traceCall` to simulate the transaction
+4. 📦 **Fetching Contract ABIs and Names**: Query Etherscan API with rate limiting (4 req/sec)
+5. 📊 **Parsing Transaction Trace**: Decode function calls and build call tree structure
+6. 💰 **Detecting Token Transfers**: Identify native and ERC-20 token transfers
+7. ✅ **Simulation Complete**: Display results with trace visualization and balance changes
+
+### Caching Strategy
+
+- 💾 **Cache Hit**: ABIs and contract names are retrieved from IndexedDB (instant)
+- 🚫 **Negative Cache**: "Not found" results are cached to prevent repeated failed requests
+- 🌐 **Cache Miss**: Fetches from Etherscan API with automatic rate limiting
+- ⏰ **Expiration**: Cache expires after 7 days (30 days for token metadata)
+- 🎯 **Chain-Aware**: Separate cache entries per chain ID
+
+### Rate Limiting
+
+- ⚡ **Token Bucket Algorithm**: Maintains 4 requests per second (below Etherscan's 5/sec limit)
+- 📊 **Automatic Queuing**: Requests are automatically queued and spaced evenly (250ms apart)
+- 🔄 **Smooth Throttling**: No burst requests, consistent API usage
+- ✅ **Error Prevention**: Eliminates "Max calls per sec rate limit reached" errors
 
 ## 🔐 Security & Privacy
 
