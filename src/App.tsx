@@ -12,6 +12,7 @@ import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { ShareModal } from '@/components/ShareModal'
 import { Settings } from '@/components/Settings'
 import { SimulationProgress } from '@/components/SimulationProgress'
+import { SupportBanner } from '@/components/SupportBanner'
 import {
   useSimulation,
   useShareTransaction,
@@ -402,6 +403,9 @@ function App() {
               </CardContent>
             </Card>
           )}
+
+          {/* Support Banner */}
+          <SupportBanner />
         </div>
       </div>
     </>
