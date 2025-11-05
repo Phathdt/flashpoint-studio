@@ -94,6 +94,10 @@ export function useLoadSharedTransaction(
               : undefined,
             chainId: fetchedData.simulationResult.chainId,
             etherscanUrl: fetchedData.simulationResult.etherscanUrl,
+            allTransfers: fetchedData.simulationResult.allTransfers,
+            tokenMetadata: fetchedData.simulationResult.tokenMetadata
+              ? new Map(Object.entries(fetchedData.simulationResult.tokenMetadata))
+              : undefined,
             error: fetchedData.simulationResult.error,
             errorDetails: fetchedData.simulationResult.errorDetails,
           }

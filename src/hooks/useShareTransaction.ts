@@ -83,6 +83,10 @@ export function useShareTransaction(
               : undefined,
             chainId: data.result.chainId,
             etherscanUrl: data.result.etherscanUrl,
+            allTransfers: data.result.allTransfers,
+            tokenMetadata: data.result.tokenMetadata
+              ? Object.fromEntries(data.result.tokenMetadata)
+              : undefined,
             error: data.result.error,
             errorDetails: data.result.errorDetails,
           }

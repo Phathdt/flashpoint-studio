@@ -1,6 +1,8 @@
 import type { ParsedCallFrame, TraceStats } from '@/lib/trace-parser'
+import type { TokenTransfer, TokenMetadata } from '@/lib/types'
 import { getAddressUrl, getNetworkName } from '@/lib/etherscan-utils'
 import { toast } from 'sonner'
+import { TransferVisualizer } from './TransferVisualizer'
 
 interface TraceVisualizerProps {
   frame: ParsedCallFrame
@@ -8,6 +10,8 @@ interface TraceVisualizerProps {
   contractNames?: Map<string, string>
   chainId?: number
   etherscanUrl?: string
+  allTransfers?: TokenTransfer[]
+  tokenMetadata?: Map<string, TokenMetadata>
 }
 
 export function TraceVisualizer({
@@ -16,6 +20,8 @@ export function TraceVisualizer({
   contractNames = new Map(),
   chainId = 1,
   etherscanUrl,
+  allTransfers,
+  tokenMetadata,
 }: TraceVisualizerProps) {
   const handleCopyValue = async (value: string, label?: string) => {
     try {
@@ -660,6 +666,17 @@ export function TraceVisualizer({
           </div>
         </div>
       </div>
+
+      {/* Balance Changes */}
+      {allTransfers && allTransfers.length > 0 && (
+        <TransferVisualizer
+          transfers={allTransfers}
+          tokenMetadata={tokenMetadata || new Map()}
+          chainId={chainId}
+          etherscanUrl={etherscanUrl}
+          contractNames={contractNames}
+        />
+      )}
 
       {/* Trace tree */}
       <div className="overflow-x-auto rounded-lg bg-muted p-4">{renderCallFrame(frame)}</div>
