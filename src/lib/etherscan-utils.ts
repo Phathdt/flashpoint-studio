@@ -1,4 +1,37 @@
 /**
+ * Get network name from chain ID
+ */
+export function getNetworkName(chainId: number): string {
+  const networkNames: Record<number, string> = {
+    // Ethereum
+    1: 'Ethereum Mainnet',
+    11155111: 'Sepolia Testnet',
+
+    // Optimism
+    10: 'Optimism',
+    11155420: 'Optimism Sepolia',
+
+    // BSC
+    56: 'BNB Smart Chain',
+    97: 'BNB Testnet',
+
+    // Polygon
+    137: 'Polygon',
+    80002: 'Polygon Amoy',
+
+    // Arbitrum
+    42161: 'Arbitrum One',
+    421614: 'Arbitrum Sepolia',
+
+    // Base
+    8453: 'Base',
+    84532: 'Base Sepolia',
+  }
+
+  return networkNames[chainId] || `Unknown Network (${chainId})`
+}
+
+/**
  * Get Etherscan URL for a given chain ID
  */
 export function getEtherscanUrl(chainId: number): string {

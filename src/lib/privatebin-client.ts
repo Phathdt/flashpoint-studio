@@ -11,6 +11,10 @@ export interface ShareableData {
   payload: string
   fromAddress: string
   toAddress: string
+  blockNumber?: string
+  apiEtherscanUrl?: string // Public URL - safe to share
+  etherscanUrl?: string // Public URL - safe to share
+  // Note: rpcUrl and etherscanApiKey are intentionally excluded for security (contain API keys)
 
   // Simulation result (if available)
   simulationResult?: {
@@ -24,8 +28,8 @@ export interface ShareableData {
       stats: any
     }
     contractNames?: Record<string, string> // Convert Map to object for JSON serialization
-    chainId?: number
-    etherscanUrl?: string
+    chainId?: number // Use chainId to identify network instead of RPC URL
+    etherscanUrl?: string // Public etherscan URL is safe to share
     error?: string
     errorDetails?: {
       type: string
