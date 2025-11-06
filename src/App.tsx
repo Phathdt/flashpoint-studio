@@ -90,7 +90,12 @@ function App() {
   } = form
 
   // Custom hooks for business logic
-  const { simulate, result: simulationResult, isSimulating, progress } = useSimulation({
+  const {
+    simulate,
+    result: simulationResult,
+    isSimulating,
+    progress,
+  } = useSimulation({
     onSuccess: (result) => {
       // Track simulation event
       trackSimulation(result.success, result.chainId)
@@ -215,10 +220,10 @@ function App() {
         shareUrl={shareUrl}
         privateBinUrl={privateBinUrl}
       />
-      <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
-        <div className={`mx-auto space-y-8 ${containerWidthClass}`}>
+      <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6 lg:p-8">
+        <div className={`mx-auto space-y-4 sm:space-y-6 md:space-y-8 ${containerWidthClass}`}>
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold">Flashpoint Studio</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold">Flashpoint Studio</h1>
             <p className="text-muted-foreground">Debug and trace EVM transactions</p>
           </div>
 
@@ -228,7 +233,7 @@ function App() {
               <CardDescription>Enter the details for your EVM transaction trace</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit(onSimulate)} className="space-y-6">
+              <form onSubmit={handleSubmit(onSimulate)} className="space-y-4 md:space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="rpcUrl">RPC URL</Label>
                   <Input
@@ -313,37 +318,46 @@ function App() {
                   )}
                 </div>
 
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    onClick={onCopyToClipboard}
-                    title="Copy form data to clipboard"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    onClick={onPasteFromClipboard}
-                    title="Paste form data from clipboard"
-                  >
-                    <ClipboardPaste className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={onCopyToClipboard}
+                      title="Copy form data to clipboard"
+                      className="flex-1 sm:flex-none"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={onPasteFromClipboard}
+                      title="Paste form data from clipboard"
+                      className="flex-1 sm:flex-none"
+                    >
+                      <ClipboardPaste className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="lg"
                     onClick={onShare}
                     disabled={isSharing}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     <Share2 className="mr-2 h-4 w-4" />
                     {isSharing ? 'Creating link...' : 'Share'}
                   </Button>
-                  <Button type="submit" className="flex-1" size="lg" disabled={isSimulating}>
+                  <Button
+                    type="submit"
+                    className="w-full sm:flex-1"
+                    size="lg"
+                    disabled={isSimulating}
+                  >
                     {isSimulating ? 'Simulating...' : 'Simulate'}
                   </Button>
                 </div>

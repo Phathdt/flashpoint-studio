@@ -23,12 +23,7 @@ export function initializeGA() {
  * @param label Optional event label
  * @param value Optional numeric value
  */
-export function trackEvent(
-  category: string,
-  action: string,
-  label?: string,
-  value?: number
-) {
+export function trackEvent(category: string, action: string, label?: string, value?: number) {
   if (!GA_MEASUREMENT_ID) return
 
   try {
