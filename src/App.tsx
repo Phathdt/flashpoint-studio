@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Share2, Copy, ClipboardPaste } from 'lucide-react'
+import { Share2, Copy, ClipboardPaste, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { ShareModal } from '@/components/ShareModal'
 import { Settings } from '@/components/Settings'
@@ -137,7 +138,7 @@ function App() {
 
   const { strategy: apiExecutionStrategy } = useApiExecutionStrategy()
 
-  const { saveFormData } = useFormPersistence(setValue)
+  const { saveFormData, restoreFormData, hasStoredData } = useFormPersistence(setValue)
 
   // Use loaded simulation result if available, otherwise use current simulation result
   const result = simulationResult || loadedSimulationResult
@@ -208,6 +209,19 @@ function App() {
 
     // Track paste action
     trackFormAction('paste')
+  }
+
+  const onRestoreLastSimulation = () => {
+    const success = restoreFormData()
+    if (success) {
+      toast.success('Form Restored', {
+        description: 'Last simulation data has been restored',
+      })
+    } else {
+      toast.error('Restore Failed', {
+        description: 'No saved simulation data found',
+      })
+    }
   }
 
   return (
@@ -339,6 +353,17 @@ function App() {
                       className="flex-1 sm:flex-none"
                     >
                       <ClipboardPaste className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={onRestoreLastSimulation}
+                      disabled={!hasStoredData}
+                      title="Restore last simulation"
+                      className="flex-1 sm:flex-none"
+                    >
+                      <RotateCcw className="h-4 w-4" />
                     </Button>
                   </div>
                   <Button

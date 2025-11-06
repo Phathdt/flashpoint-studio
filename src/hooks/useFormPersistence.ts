@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { UseFormSetValue, Path, PathValue } from 'react-hook-form'
 
 const STORAGE_KEY = 'flashpoint-last-simulation-form'
@@ -17,12 +17,40 @@ export interface PersistedFormData {
 
 /**
  * Hook to persist and restore form data from localStorage
- * Automatically saves form data on successful simulation
- * Restores form data on component mount (page reload)
+ * Saves form data on successful simulation
+ * Provides manual restore function via button
  */
 export function useFormPersistence<T extends PersistedFormData>(setValue: UseFormSetValue<T>) {
-  // Restore form data from localStorage on mount
+  const [hasStoredData, setHasStoredData] = useState(false)
+
+  // Check if there's stored data on mount
   useEffect(() => {
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY)
+      setHasStoredData(!!savedData)
+    } catch (error) {
+      console.warn('Failed to check for stored form data:', error)
+      setHasStoredData(false)
+    }
+  }, [])
+
+  // Save form data to localStorage
+  const saveFormData = (data: PersistedFormData) => {
+    try {
+      const dataToSave: PersistedFormData = {
+        ...data,
+        timestamp: Date.now(),
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
+      setHasStoredData(true)
+      console.log('Saved form data to localStorage')
+    } catch (error) {
+      console.warn('Failed to save form data to localStorage:', error)
+    }
+  }
+
+  // Restore form data from localStorage
+  const restoreFormData = () => {
     try {
       const savedData = localStorage.getItem(STORAGE_KEY)
       if (savedData) {
@@ -44,25 +72,16 @@ export function useFormPersistence<T extends PersistedFormData>(setValue: UseFor
           setValue('etherscanUrl' as Path<T>, parsed.etherscanUrl as PathValue<T, Path<T>>)
         if (parsed.etherscanApiKey)
           setValue('etherscanApiKey' as Path<T>, parsed.etherscanApiKey as PathValue<T, Path<T>>)
+
+        return true
       }
+      return false
     } catch (error) {
       console.warn('Failed to restore form data from localStorage:', error)
       // Clear corrupted data
       localStorage.removeItem(STORAGE_KEY)
-    }
-  }, [setValue])
-
-  // Save form data to localStorage
-  const saveFormData = (data: PersistedFormData) => {
-    try {
-      const dataToSave: PersistedFormData = {
-        ...data,
-        timestamp: Date.now(),
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
-      console.log('Saved form data to localStorage')
-    } catch (error) {
-      console.warn('Failed to save form data to localStorage:', error)
+      setHasStoredData(false)
+      return false
     }
   }
 
@@ -70,6 +89,7 @@ export function useFormPersistence<T extends PersistedFormData>(setValue: UseFor
   const clearFormData = () => {
     try {
       localStorage.removeItem(STORAGE_KEY)
+      setHasStoredData(false)
       console.log('Cleared form data from localStorage')
     } catch (error) {
       console.warn('Failed to clear form data from localStorage:', error)
@@ -78,6 +98,8 @@ export function useFormPersistence<T extends PersistedFormData>(setValue: UseFor
 
   return {
     saveFormData,
+    restoreFormData,
     clearFormData,
+    hasStoredData,
   }
 }
