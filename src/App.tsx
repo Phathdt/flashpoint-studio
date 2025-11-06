@@ -20,6 +20,7 @@ import {
   useClipboardForm,
   useContainerSize,
   useApiExecutionStrategy,
+  useFormPersistence,
 } from '@/hooks'
 
 const evmTracingSchema = z.object({
@@ -125,6 +126,8 @@ function App() {
 
   const { strategy: apiExecutionStrategy } = useApiExecutionStrategy()
 
+  const { saveFormData } = useFormPersistence(setValue)
+
   // Use loaded simulation result if available, otherwise use current simulation result
   const result = simulationResult || loadedSimulationResult
 
@@ -140,6 +143,18 @@ function App() {
       etherscanUrl: data.etherscanUrl,
       etherscanApiKey: data.etherscanApiKey,
       apiExecutionStrategy,
+    })
+
+    // Save form data to localStorage after simulation (success or failure)
+    saveFormData({
+      rpcUrl: data.rpcUrl,
+      payload: data.payload,
+      fromAddress: data.fromAddress,
+      toAddress: data.toAddress,
+      blockNumber: data.blockNumber,
+      apiEtherscanUrl: data.apiEtherscanUrl,
+      etherscanUrl: data.etherscanUrl,
+      etherscanApiKey: data.etherscanApiKey,
     })
   }
 

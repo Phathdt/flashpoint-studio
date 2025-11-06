@@ -6,6 +6,7 @@ export { useClipboardForm } from './useClipboardForm'
 export { useContainerSize } from './useContainerSize'
 export { useCopyToClipboard } from './useCopyToClipboard'
 export { useApiExecutionStrategy } from './useApiExecutionStrategy'
+export { useFormPersistence } from './useFormPersistence'
 
 // Type exports
 export type {
