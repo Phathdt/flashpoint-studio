@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getCache } from './indexeddb-cache'
 import { RateLimiter } from './rate-limiter'
-import type { ApiExecutionStrategy } from './types'
+import type { ApiExecutionStrategy, RetryConfig } from './types'
 
 export interface EtherscanConfig {
   apiKey: string
   apiUrl: string
   chainId?: number // Optional: For Etherscan API v2 unified endpoint
   executionStrategy?: ApiExecutionStrategy // Optional: parallel (default) or sequential
+  retryConfig?: RetryConfig // Optional: retry configuration
 }
 
 /**
@@ -23,6 +24,7 @@ export class EtherscanClient {
   private isV2Api: boolean
   private rateLimiter: RateLimiter
   private executionStrategy: ApiExecutionStrategy
+  private retryConfig: RetryConfig
 
   constructor(config: EtherscanConfig) {
     this.config = config
@@ -32,6 +34,54 @@ export class EtherscanClient {
     this.rateLimiter = new RateLimiter(4)
     // Default to parallel execution for backward compatibility
     this.executionStrategy = config.executionStrategy || 'parallel'
+    // Default retry config: 3 retries with 30s timeout
+    this.retryConfig = config.retryConfig || { maxRetries: 3, timeout: 30000 }
+  }
+
+  /**
+   * Execute a request with retry logic and timeout
+   * @param fn Function to execute
+   * @param context Context description for logging
+   * @returns Result from the function or throws error after all retries exhausted
+   */
+  private async executeWithRetry<T>(fn: () => Promise<T>, context: string): Promise<T> {
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        // Create timeout promise
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Request timeout after ${this.retryConfig.timeout}ms`))
+          }, this.retryConfig.timeout)
+        })
+
+        // Race between the actual request and timeout
+        const result = await Promise.race([fn(), timeoutPromise])
+
+        // Success - return result
+        if (attempt > 0) {
+          console.log(`✓ ${context} succeeded on retry ${attempt}`)
+        }
+        return result
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000) // Exponential backoff, max 5s
+          console.warn(
+            `⚠ ${context} failed (attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1}): ${lastError.message}. Retrying in ${delay}ms...`
+          )
+          await new Promise((resolve) => setTimeout(resolve, delay))
+        } else {
+          console.error(
+            `✗ ${context} failed after ${this.retryConfig.maxRetries + 1} attempts: ${lastError.message}`
+          )
+        }
+      }
+    }
+
+    throw lastError || new Error(`${context} failed after all retries`)
   }
 
   /**
@@ -50,7 +100,8 @@ export class EtherscanClient {
       return cachedAbi
     }
 
-    try {
+    // Fetch with retry logic
+    return this.executeWithRetry(async () => {
       const url = new URL(this.config.apiUrl)
 
       // Add chainid for Etherscan API v2
@@ -81,6 +132,10 @@ export class EtherscanClient {
         })
       )
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
       const data = (await response.json()) as {
         status: string
         result?: string
@@ -99,10 +154,10 @@ export class EtherscanClient {
         await cache.setAbi(cacheKey, [], this.config.chainId)
         return null
       }
-    } catch (error) {
-      console.warn(`Failed to fetch ABI for ${address}:`, error)
+    }, `Fetch ABI for ${address}`).catch((error) => {
+      console.warn(`Failed to fetch ABI for ${address} after retries:`, error)
       return null
-    }
+    })
   }
 
   /**
@@ -212,7 +267,8 @@ export class EtherscanClient {
       return cachedName
     }
 
-    try {
+    // Fetch with retry logic
+    return this.executeWithRetry(async () => {
       const url = new URL(this.config.apiUrl)
 
       // Add chainid for Etherscan API v2
@@ -242,6 +298,10 @@ export class EtherscanClient {
         })
       )
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
       const data = (await response.json()) as {
         status: string
         result?: Array<{ ContractName: string }>
@@ -262,10 +322,10 @@ export class EtherscanClient {
       console.debug(`No contract name found for ${address}`)
       await cache.setContractName(cacheKey, '', this.config.chainId)
       return null
-    } catch (error) {
-      console.debug(`Failed to fetch contract name for ${address}:`, error)
+    }, `Fetch contract name for ${address}`).catch((error) => {
+      console.debug(`Failed to fetch contract name for ${address} after retries:`, error)
       return null
-    }
+    })
   }
 
   /**

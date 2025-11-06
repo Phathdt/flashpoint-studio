@@ -28,6 +28,14 @@ export interface TraceConfig {
 export type ApiExecutionStrategy = 'parallel' | 'sequential'
 
 /**
+ * Retry configuration for API requests
+ */
+export interface RetryConfig {
+  maxRetries: number // Maximum number of retry attempts
+  timeout: number // Timeout in milliseconds for each request
+}
+
+/**
  * Simulation request parameters
  */
 export interface SimulationRequest {
