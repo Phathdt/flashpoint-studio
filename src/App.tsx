@@ -22,6 +22,7 @@ import {
   useApiExecutionStrategy,
   useFormPersistence,
 } from '@/hooks'
+import { trackSimulation, trackShare, trackFormAction } from '@/lib/analytics'
 
 const evmTracingSchema = z.object({
   rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
@@ -89,7 +90,12 @@ function App() {
   } = form
 
   // Custom hooks for business logic
-  const { simulate, result: simulationResult, isSimulating, progress } = useSimulation()
+  const { simulate, result: simulationResult, isSimulating, progress } = useSimulation({
+    onSuccess: (result) => {
+      // Track simulation event
+      trackSimulation(result.success, result.chainId)
+    },
+  })
 
   const { share, isSharing, shareUrl, privateBinUrl } = useShareTransaction({
     onSuccess: () => setShareModalOpen(true),
@@ -170,6 +176,9 @@ function App() {
       etherscanApiKey: values.etherscanApiKey,
       result: simulationResult || undefined,
     })
+
+    // Track share event
+    trackShare()
   }
 
   const onCopyToClipboard = async () => {
@@ -184,10 +193,16 @@ function App() {
       etherscanUrl: values.etherscanUrl,
       etherscanApiKey: values.etherscanApiKey,
     })
+
+    // Track copy action
+    trackFormAction('copy')
   }
 
   const onPasteFromClipboard = async () => {
     await pasteFromClipboard()
+
+    // Track paste action
+    trackFormAction('paste')
   }
 
   return (
