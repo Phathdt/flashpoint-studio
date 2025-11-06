@@ -23,6 +23,11 @@ export interface TraceConfig {
 }
 
 /**
+ * API execution strategy for fetching multiple contracts
+ */
+export type ApiExecutionStrategy = 'parallel' | 'sequential'
+
+/**
  * Simulation request parameters
  */
 export interface SimulationRequest {
@@ -34,6 +39,7 @@ export interface SimulationRequest {
   apiEtherscanUrl?: string
   etherscanUrl?: string
   etherscanApiKey?: string
+  apiExecutionStrategy?: ApiExecutionStrategy
   onProgress?: (step: number, totalSteps: number, message: string) => void
 }
 

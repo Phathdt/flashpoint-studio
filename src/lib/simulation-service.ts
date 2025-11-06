@@ -90,6 +90,7 @@ export class SimulationService {
         apiKey: request.etherscanApiKey || '',
         apiUrl: apiUrl,
         chainId: chainId,
+        executionStrategy: request.apiExecutionStrategy,
       })
 
       // Determine block tag - use provided blockNumber or default to 'latest'

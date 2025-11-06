@@ -19,6 +19,7 @@ import {
   useLoadSharedTransaction,
   useClipboardForm,
   useContainerSize,
+  useApiExecutionStrategy,
 } from '@/hooks'
 
 const evmTracingSchema = z.object({
@@ -122,6 +123,8 @@ function App() {
 
   const { setContainerSize, containerWidthClass } = useContainerSize()
 
+  const { strategy: apiExecutionStrategy } = useApiExecutionStrategy()
+
   // Use loaded simulation result if available, otherwise use current simulation result
   const result = simulationResult || loadedSimulationResult
 
@@ -136,6 +139,7 @@ function App() {
       apiEtherscanUrl: data.apiEtherscanUrl,
       etherscanUrl: data.etherscanUrl,
       etherscanApiKey: data.etherscanApiKey,
+      apiExecutionStrategy,
     })
   }
 

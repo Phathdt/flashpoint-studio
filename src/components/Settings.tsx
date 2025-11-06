@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTheme } from 'next-themes'
+import { useApiExecutionStrategy } from '@/hooks'
+import type { ApiExecutionStrategy } from '@/lib/types'
 
 export type ContainerSize = 'small' | 'medium' | 'large' | 'extra-large' | 'full'
 
@@ -33,10 +35,28 @@ const SIZE_OPTIONS: { value: ContainerSize; label: string; description: string }
   { value: 'full', label: 'Full Width', description: 'Maximum width (100%)' },
 ]
 
+const API_STRATEGY_OPTIONS: {
+  value: ApiExecutionStrategy
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'parallel',
+    label: 'Parallel (Recommended)',
+    description: 'Fetch multiple contracts simultaneously with rate limiting (faster)',
+  },
+  {
+    value: 'sequential',
+    label: 'Sequential',
+    description: 'Fetch contracts one at a time (slower, more conservative)',
+  },
+]
+
 export function Settings({ onSizeChange }: SettingsProps) {
   const [open, setOpen] = useState(false)
   const [containerSize, setContainerSize] = useState<ContainerSize>('large')
   const { theme, setTheme } = useTheme()
+  const { strategy: apiStrategy, updateStrategy: setApiStrategy } = useApiExecutionStrategy()
 
   // Load size preference from localStorage
   useEffect(() => {
@@ -104,6 +124,26 @@ export function Settings({ onSizeChange }: SettingsProps) {
             </Select>
             <p className="text-xs text-muted-foreground">
               {SIZE_OPTIONS.find((opt) => opt.value === containerSize)?.description}
+            </p>
+          </div>
+
+          {/* API Execution Strategy Setting */}
+          <div className="space-y-2">
+            <Label htmlFor="api-strategy">API Execution Strategy</Label>
+            <Select value={apiStrategy} onValueChange={setApiStrategy}>
+              <SelectTrigger id="api-strategy">
+                <SelectValue placeholder="Select strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                {API_STRATEGY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {API_STRATEGY_OPTIONS.find((opt) => opt.value === apiStrategy)?.description}
             </p>
           </div>
         </div>

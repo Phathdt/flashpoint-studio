@@ -5,6 +5,7 @@ export { useLoadSharedTransaction } from './useLoadSharedTransaction'
 export { useClipboardForm } from './useClipboardForm'
 export { useContainerSize } from './useContainerSize'
 export { useCopyToClipboard } from './useCopyToClipboard'
+export { useApiExecutionStrategy } from './useApiExecutionStrategy'
 
 // Type exports
 export type {

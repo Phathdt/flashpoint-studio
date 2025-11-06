@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getCache } from './indexeddb-cache'
 import { RateLimiter } from './rate-limiter'
+import type { ApiExecutionStrategy } from './types'
 
 export interface EtherscanConfig {
   apiKey: string
   apiUrl: string
   chainId?: number // Optional: For Etherscan API v2 unified endpoint
+  executionStrategy?: ApiExecutionStrategy // Optional: parallel (default) or sequential
 }
 
 /**
@@ -20,6 +22,7 @@ export class EtherscanClient {
   private config: EtherscanConfig
   private isV2Api: boolean
   private rateLimiter: RateLimiter
+  private executionStrategy: ApiExecutionStrategy
 
   constructor(config: EtherscanConfig) {
     this.config = config
@@ -27,6 +30,8 @@ export class EtherscanClient {
     this.isV2Api = config.apiUrl.includes('/v2/api')
     // Initialize rate limiter: 4 requests per second (safe margin below 5/sec limit)
     this.rateLimiter = new RateLimiter(4)
+    // Default to parallel execution for backward compatibility
+    this.executionStrategy = config.executionStrategy || 'parallel'
   }
 
   /**
@@ -137,20 +142,31 @@ export class EtherscanClient {
 
     const cachedCount = uniqueAddresses.length - addressesToFetch.length
     console.log(
-      `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${cachedCount} cached)...`
+      `Fetching ABIs for ${addressesToFetch.length} contract(s) from Explorer API (${cachedCount} cached, strategy: ${this.executionStrategy})...`
     )
 
-    // Fetch all addresses with rate limiting handled by RateLimiter
-    const results = await Promise.all(
-      addressesToFetch.map((address) => this.fetchContractAbi(address))
-    )
-
-    // Add successful results to map
-    results.forEach((abi, index) => {
-      if (abi) {
-        abiMap.set(addressesToFetch[index], abi)
+    // Fetch addresses based on execution strategy
+    if (this.executionStrategy === 'sequential') {
+      // Sequential execution: fetch one at a time
+      for (const address of addressesToFetch) {
+        const abi = await this.fetchContractAbi(address)
+        if (abi) {
+          abiMap.set(address, abi)
+        }
       }
-    })
+    } else {
+      // Parallel execution with rate limiting (default)
+      const results = await Promise.all(
+        addressesToFetch.map((address) => this.fetchContractAbi(address))
+      )
+
+      // Add successful results to map
+      results.forEach((abi, index) => {
+        if (abi) {
+          abiMap.set(addressesToFetch[index], abi)
+        }
+      })
+    }
 
     console.log(`✓ Fetched ${abiMap.size} ABI(s) from Explorer API`)
     return abiMap
@@ -289,20 +305,31 @@ export class EtherscanClient {
 
     const cachedCount = uniqueAddresses.length - addressesToFetch.length
     console.log(
-      `Fetching contract names for ${addressesToFetch.length} address(es) (${cachedCount} cached)...`
+      `Fetching contract names for ${addressesToFetch.length} address(es) (${cachedCount} cached, strategy: ${this.executionStrategy})...`
     )
 
-    // Fetch all addresses with rate limiting handled by RateLimiter
-    const results = await Promise.all(
-      addressesToFetch.map((address) => this.fetchContractName(address))
-    )
-
-    // Add successful results to map
-    results.forEach((name, index) => {
-      if (name) {
-        nameMap.set(addressesToFetch[index], name)
+    // Fetch addresses based on execution strategy
+    if (this.executionStrategy === 'sequential') {
+      // Sequential execution: fetch one at a time
+      for (const address of addressesToFetch) {
+        const name = await this.fetchContractName(address)
+        if (name) {
+          nameMap.set(address, name)
+        }
       }
-    })
+    } else {
+      // Parallel execution with rate limiting (default)
+      const results = await Promise.all(
+        addressesToFetch.map((address) => this.fetchContractName(address))
+      )
+
+      // Add successful results to map
+      results.forEach((name, index) => {
+        if (name) {
+          nameMap.set(addressesToFetch[index], name)
+        }
+      })
+    }
 
     console.log(`✓ Fetched ${nameMap.size} contract name(s)`)
     return nameMap

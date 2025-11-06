@@ -71,16 +71,18 @@ describe('useSimulation', () => {
     )
 
     expect(result.current.error).toBeNull()
-    expect(mockSimulate).toHaveBeenCalledWith({
-      rpcUrl: params.rpcUrl,
-      payload: params.payload,
-      fromAddress: params.fromAddress,
-      toAddress: params.toAddress,
-      blockNumber: undefined,
-      apiEtherscanUrl: undefined,
-      etherscanUrl: undefined,
-      etherscanApiKey: undefined,
-    })
+    expect(mockSimulate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: params.rpcUrl,
+        payload: params.payload,
+        fromAddress: params.fromAddress,
+        toAddress: params.toAddress,
+        blockNumber: undefined,
+        apiEtherscanUrl: undefined,
+        etherscanUrl: undefined,
+        etherscanApiKey: undefined,
+      })
+    )
     expect(toast.success).toHaveBeenCalledWith('Simulation Successful', {
       description: 'Transaction simulation completed successfully',
     })
@@ -377,7 +379,7 @@ describe('useSimulation', () => {
     })
 
     await waitFor(() => {
-      expect(mockSimulate).toHaveBeenCalledWith(params)
+      expect(mockSimulate).toHaveBeenCalledWith(expect.objectContaining(params))
     })
   })
 

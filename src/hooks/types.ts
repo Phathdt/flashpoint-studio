@@ -1,4 +1,4 @@
-import type { SimulationResult } from '@/lib/types'
+import type { SimulationResult, ApiExecutionStrategy } from '@/lib/types'
 import type { ContainerSize } from '@/components/Settings'
 
 // ============================================================================
@@ -14,6 +14,7 @@ export interface SimulationRequest {
   apiEtherscanUrl?: string
   etherscanUrl?: string
   etherscanApiKey?: string
+  apiExecutionStrategy?: ApiExecutionStrategy
 }
 
 export interface SimulationProgress {
