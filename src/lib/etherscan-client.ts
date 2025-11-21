@@ -30,8 +30,8 @@ export class EtherscanClient {
     this.config = config
     // Detect if using Etherscan API v2 (unified endpoint)
     this.isV2Api = config.apiUrl.includes('/v2/api')
-    // Initialize rate limiter: 4 requests per second (safe margin below 5/sec limit)
-    this.rateLimiter = new RateLimiter(4)
+    // Initialize rate limiter: 2 requests per second (conservative to avoid rate limits)
+    this.rateLimiter = new RateLimiter(2)
     // Default to parallel execution for backward compatibility
     this.executionStrategy = config.executionStrategy || 'parallel'
     // Default retry config: 3 retries with 30s timeout
@@ -68,7 +68,10 @@ export class EtherscanClient {
         lastError = error instanceof Error ? error : new Error(String(error))
 
         if (attempt < this.retryConfig.maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 5000) // Exponential backoff, max 5s
+          // Use longer delay for rate limit errors
+          const isRateLimitError = lastError.message.includes('rate limit')
+          const baseDelay = isRateLimitError ? 2000 : 1000
+          const delay = Math.min(baseDelay * Math.pow(2, attempt), 10000) // Exponential backoff, max 10s
           console.warn(
             `⚠ ${context} failed (attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1}): ${lastError.message}. Retrying in ${delay}ms...`
           )
@@ -140,6 +143,11 @@ export class EtherscanClient {
         status: string
         result?: string
         message?: string
+      }
+
+      // Check for rate limit error - throw to trigger retry
+      if (data.message?.includes('rate limit')) {
+        throw new Error(`Rate limit reached: ${data.result || data.message}`)
       }
 
       if (data.status === '1' && data.result) {
@@ -306,6 +314,11 @@ export class EtherscanClient {
         status: string
         result?: Array<{ ContractName: string }>
         message?: string
+      }
+
+      // Check for rate limit error - throw to trigger retry
+      if (data.message?.includes('rate limit')) {
+        throw new Error(`Rate limit reached: ${data.message}`)
       }
 
       if (data.status === '1' && data.result && data.result.length > 0) {

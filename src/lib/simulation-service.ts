@@ -132,13 +132,18 @@ export class SimulationService {
         console.log(`Found ${addresses.length} unique contract address(es)`)
 
         if (addresses.length > 0) {
-          // Step 4: Fetch ABIs and contract names
+          // Step 4: Fetch ABIs first, then contract names (sequential to respect rate limits)
           reportProgress(4, 'Fetching contract ABIs and names...')
 
-          const [abiMap, nameMap] = await Promise.all([
-            etherscanClient.fetchMultipleAbis(addresses),
-            etherscanClient.fetchMultipleContractNames(addresses),
-          ])
+          // Fetch ABIs first
+          const abiMap = await etherscanClient.fetchMultipleAbis(addresses)
+
+          // Then fetch contract names (only for contracts with ABIs)
+          const addressesWithAbis = Array.from(abiMap.keys())
+          const nameMap =
+            addressesWithAbis.length > 0
+              ? await etherscanClient.fetchMultipleContractNames(addressesWithAbis)
+              : new Map<string, string>()
 
           // Add fetched ABIs to function decoder
           const fetchedAbis = Array.from(abiMap.values())
