@@ -15,6 +15,7 @@ export interface SimulationRequest {
   etherscanUrl?: string
   etherscanApiKey?: string
   apiExecutionStrategy?: ApiExecutionStrategy
+  apiRateLimit?: number
 }
 
 export interface SimulationProgress {
