@@ -91,6 +91,7 @@ export class SimulationService {
         apiUrl: apiUrl,
         chainId: chainId,
         executionStrategy: request.apiExecutionStrategy,
+        rateLimit: request.apiRateLimit,
       })
 
       // Determine block tag - use provided blockNumber or default to 'latest'

@@ -18,8 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTheme } from 'next-themes'
-import { useApiExecutionStrategy } from '@/hooks'
+import { useApiExecutionStrategy, useApiRateLimit } from '@/hooks'
 import type { ApiExecutionStrategy } from '@/lib/types'
+import { Input } from '@/components/ui/input'
 
 export type ContainerSize = 'small' | 'medium' | 'large' | 'extra-large' | 'full'
 
@@ -57,6 +58,7 @@ export function Settings({ onSizeChange }: SettingsProps) {
   const [containerSize, setContainerSize] = useState<ContainerSize>('large')
   const { theme, setTheme } = useTheme()
   const { strategy: apiStrategy, updateStrategy: setApiStrategy } = useApiExecutionStrategy()
+  const { rateLimit: apiRateLimit, updateRateLimit: setApiRateLimit } = useApiRateLimit()
 
   // Load size preference from localStorage
   useEffect(() => {
@@ -144,6 +146,22 @@ export function Settings({ onSizeChange }: SettingsProps) {
             </Select>
             <p className="text-xs text-muted-foreground">
               {API_STRATEGY_OPTIONS.find((opt) => opt.value === apiStrategy)?.description}
+            </p>
+          </div>
+
+          {/* API Rate Limit Setting */}
+          <div className="space-y-2">
+            <Label htmlFor="api-rate-limit">API Rate Limit (requests/sec)</Label>
+            <Input
+              id="api-rate-limit"
+              type="number"
+              min={2}
+              max={20}
+              value={apiRateLimit}
+              onChange={(e) => setApiRateLimit(parseInt(e.target.value, 10) || 2)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Requests per second (min: 2). Use multiple API keys to increase effective rate.
             </p>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   useClipboardForm,
   useContainerSize,
   useApiExecutionStrategy,
+  useApiRateLimit,
   useFormPersistence,
 } from '@/hooks'
 import { trackSimulation, trackShare, trackFormAction } from '@/lib/analytics'
@@ -137,6 +138,7 @@ function App() {
   const { setContainerSize, containerWidthClass } = useContainerSize()
 
   const { strategy: apiExecutionStrategy } = useApiExecutionStrategy()
+  const { rateLimit: apiRateLimit } = useApiRateLimit()
 
   const { saveFormData, restoreFormData, hasStoredData } = useFormPersistence(setValue)
 
@@ -155,6 +157,7 @@ function App() {
       etherscanUrl: data.etherscanUrl,
       etherscanApiKey: data.etherscanApiKey,
       apiExecutionStrategy,
+      apiRateLimit,
     })
 
     // Save form data to localStorage after simulation (success or failure)
@@ -321,12 +324,15 @@ function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="etherscanApiKey">Etherscan API Key (Optional)</Label>
+                  <Label htmlFor="etherscanApiKey">Etherscan API Key(s) (Optional)</Label>
                   <Input
                     id="etherscanApiKey"
-                    placeholder="Your Etherscan API key"
+                    placeholder="key1,key2,key3 (comma-separated for rotation)"
                     {...register('etherscanApiKey')}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Multiple keys can be comma-separated for rotation to avoid rate limits
+                  </p>
                   {errors.etherscanApiKey && (
                     <p className="text-sm text-destructive">{errors.etherscanApiKey.message}</p>
                   )}

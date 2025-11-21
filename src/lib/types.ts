@@ -46,8 +46,9 @@ export interface SimulationRequest {
   blockNumber?: string
   apiEtherscanUrl?: string
   etherscanUrl?: string
-  etherscanApiKey?: string
+  etherscanApiKey?: string // Comma-separated API keys for rotation (e.g., "key1,key2,key3")
   apiExecutionStrategy?: ApiExecutionStrategy
+  apiRateLimit?: number // Requests per second (default: 2, min: 2)
   onProgress?: (step: number, totalSteps: number, message: string) => void
 }
 

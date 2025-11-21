@@ -4,11 +4,12 @@ import { RateLimiter } from './rate-limiter'
 import type { ApiExecutionStrategy, RetryConfig } from './types'
 
 export interface EtherscanConfig {
-  apiKey: string
+  apiKey: string // Comma-separated API keys for rotation (e.g., "key1,key2,key3")
   apiUrl: string
   chainId?: number // Optional: For Etherscan API v2 unified endpoint
   executionStrategy?: ApiExecutionStrategy // Optional: parallel (default) or sequential
   retryConfig?: RetryConfig // Optional: retry configuration
+  rateLimit?: number // Optional: requests per second (default: 2, min: 2)
 }
 
 /**
@@ -22,20 +23,70 @@ export interface EtherscanConfig {
 export class EtherscanClient {
   private config: EtherscanConfig
   private isV2Api: boolean
-  private rateLimiter: RateLimiter
+  private rateLimiters: Map<string, RateLimiter> // Per-key rate limiters
+  private globalRateLimiter: RateLimiter // Fallback for no API key
   private executionStrategy: ApiExecutionStrategy
   private retryConfig: RetryConfig
+  private apiKeys: string[]
+  private currentKeyIndex: number
+  private ratePerKey: number
 
   constructor(config: EtherscanConfig) {
     this.config = config
     // Detect if using Etherscan API v2 (unified endpoint)
     this.isV2Api = config.apiUrl.includes('/v2/api')
-    // Initialize rate limiter: 2 requests per second (conservative to avoid rate limits)
-    this.rateLimiter = new RateLimiter(2)
+    // Parse comma-separated API keys for rotation
+    this.apiKeys = config.apiKey
+      ? config.apiKey
+          .split(',')
+          .map((k) => k.trim())
+          .filter((k) => k.length > 0)
+      : []
+    this.currentKeyIndex = 0
+
+    // Calculate rate per key: total rate limit / number of keys
+    const totalRateLimit = Math.max(config.rateLimit || 2, 2)
+    const numKeys = Math.max(this.apiKeys.length, 1)
+    this.ratePerKey = Math.max(Math.floor(totalRateLimit / numKeys), 1)
+
+    // Initialize per-key rate limiters
+    this.rateLimiters = new Map()
+    for (const key of this.apiKeys) {
+      this.rateLimiters.set(key, new RateLimiter(this.ratePerKey))
+    }
+    // Fallback rate limiter for no API key case
+    this.globalRateLimiter = new RateLimiter(this.ratePerKey)
+
     // Default to parallel execution for backward compatibility
     this.executionStrategy = config.executionStrategy || 'parallel'
     // Default retry config: 3 retries with 30s timeout
     this.retryConfig = config.retryConfig || { maxRetries: 3, timeout: 30000 }
+
+    if (this.apiKeys.length > 1) {
+      console.log(
+        `Using ${this.apiKeys.length} API keys with rotation (${this.ratePerKey} RPS per key, ${totalRateLimit} RPS total)`
+      )
+    } else {
+      console.log(`Using rate limit: ${this.ratePerKey} RPS`)
+    }
+  }
+
+  /**
+   * Get the next API key using round-robin rotation
+   */
+  private getNextApiKey(): string {
+    if (this.apiKeys.length === 0) return ''
+    const key = this.apiKeys[this.currentKeyIndex]
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length
+    return key
+  }
+
+  /**
+   * Get rate limiter for a specific API key
+   */
+  private getRateLimiter(apiKey: string): RateLimiter {
+    if (!apiKey) return this.globalRateLimiter
+    return this.rateLimiters.get(apiKey) || this.globalRateLimiter
   }
 
   /**
@@ -116,8 +167,9 @@ export class EtherscanClient {
       url.searchParams.set('action', 'getabi')
       url.searchParams.set('address', address)
 
-      if (this.config.apiKey) {
-        url.searchParams.set('apikey', this.config.apiKey)
+      const apiKey = this.getNextApiKey()
+      if (apiKey) {
+        url.searchParams.set('apikey', apiKey)
       }
 
       const apiVersion = this.isV2Api ? 'v2' : 'v1'
@@ -126,8 +178,9 @@ export class EtherscanClient {
       // Use proxy to avoid CORS issues
       const proxyUrl = `/api/etherscan${url.pathname}${url.search}`
 
-      // Apply rate limiting before making the request
-      const response = await this.rateLimiter.execute(() =>
+      // Apply per-key rate limiting before making the request
+      const rateLimiter = this.getRateLimiter(apiKey)
+      const response = await rateLimiter.execute(() =>
         fetch(proxyUrl, {
           headers: {
             'x-target-url': url.toString(),
@@ -288,8 +341,9 @@ export class EtherscanClient {
       url.searchParams.set('action', 'getsourcecode')
       url.searchParams.set('address', address)
 
-      if (this.config.apiKey) {
-        url.searchParams.set('apikey', this.config.apiKey)
+      const apiKey = this.getNextApiKey()
+      if (apiKey) {
+        url.searchParams.set('apikey', apiKey)
       }
 
       console.debug(`Fetching contract name for ${address}...`)
@@ -297,8 +351,9 @@ export class EtherscanClient {
       // Use proxy to avoid CORS issues
       const proxyUrl = `/api/etherscan${url.pathname}${url.search}`
 
-      // Apply rate limiting before making the request
-      const response = await this.rateLimiter.execute(() =>
+      // Apply per-key rate limiting before making the request
+      const rateLimiter = this.getRateLimiter(apiKey)
+      const response = await rateLimiter.execute(() =>
         fetch(proxyUrl, {
           headers: {
             'x-target-url': url.toString(),
