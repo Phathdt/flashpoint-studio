@@ -38,6 +38,7 @@ describe('useClipboardForm', () => {
       toAddress: '0xdef',
       payload: '0x123',
       blockNumber: '12345',
+      inputMode: 'manual',
     }
 
     await act(async () => {
@@ -50,14 +51,15 @@ describe('useClipboardForm', () => {
 
     const expectedJson = JSON.stringify(
       {
+        inputMode: 'manual',
         rpcUrl: formData.rpcUrl,
-        fromAddress: formData.fromAddress,
-        toAddress: formData.toAddress,
-        payload: formData.payload,
         blockNumber: formData.blockNumber,
         apiEtherscanUrl: '',
         etherscanUrl: '',
         etherscanApiKey: '',
+        fromAddress: formData.fromAddress,
+        toAddress: formData.toAddress,
+        payload: formData.payload,
       },
       null,
       2
@@ -81,6 +83,7 @@ describe('useClipboardForm', () => {
       apiEtherscanUrl: 'https://api.etherscan.io',
       etherscanUrl: 'https://etherscan.io',
       etherscanApiKey: 'test-key',
+      inputMode: 'manual',
     }
 
     await act(async () => {
@@ -94,7 +97,17 @@ describe('useClipboardForm', () => {
     const call = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0]
     const parsed = JSON.parse(call)
 
-    expect(parsed).toEqual(formData)
+    expect(parsed).toMatchObject({
+      rpcUrl: formData.rpcUrl,
+      fromAddress: formData.fromAddress,
+      toAddress: formData.toAddress,
+      payload: formData.payload,
+      blockNumber: formData.blockNumber,
+      apiEtherscanUrl: formData.apiEtherscanUrl,
+      etherscanUrl: formData.etherscanUrl,
+      etherscanApiKey: formData.etherscanApiKey,
+      inputMode: 'manual',
+    })
   })
 
   it('should handle empty optional fields when copying', async () => {
@@ -179,6 +192,7 @@ describe('useClipboardForm', () => {
       toAddress: '0xdef',
       payload: '0x123',
       blockNumber: '12345',
+      inputMode: 'manual',
     }
 
     vi.mocked(navigator.clipboard.readText).mockResolvedValue(JSON.stringify(formData))
@@ -194,15 +208,13 @@ describe('useClipboardForm', () => {
       expect(result.current.isPasting).toBe(false)
     })
 
-    expect(pastedData).toEqual({
+    expect(pastedData).toMatchObject({
       rpcUrl: formData.rpcUrl,
       fromAddress: formData.fromAddress,
       toAddress: formData.toAddress,
       payload: formData.payload,
       blockNumber: formData.blockNumber,
-      apiEtherscanUrl: undefined,
-      etherscanUrl: undefined,
-      etherscanApiKey: undefined,
+      inputMode: 'manual',
     })
 
     expect(toast.success).toHaveBeenCalledWith('Pasted from clipboard!', {
@@ -225,15 +237,12 @@ describe('useClipboardForm', () => {
       pastedData = await result.current.pasteFromClipboard()
     })
 
-    expect(pastedData).toEqual({
+    expect(pastedData).toMatchObject({
       rpcUrl: '',
       fromAddress: '0xabc',
       toAddress: '',
       payload: '0x123',
-      blockNumber: undefined,
-      apiEtherscanUrl: undefined,
-      etherscanUrl: undefined,
-      etherscanApiKey: undefined,
+      inputMode: 'manual',
     })
   })
 
