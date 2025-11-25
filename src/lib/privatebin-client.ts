@@ -6,6 +6,7 @@
 import { PrivatebinClient } from '@pixelfactory/privatebin'
 import bs58 from 'bs58'
 import type { TokenTransfer, TokenMetadata } from './types'
+import { InputMode } from './constants'
 
 export interface ShareableData {
   // Transaction inputs
@@ -16,6 +17,10 @@ export interface ShareableData {
   apiEtherscanUrl?: string // Public URL - safe to share
   etherscanUrl?: string // Public URL - safe to share
   // Note: rpcUrl and etherscanApiKey are intentionally excluded for security (contain API keys)
+
+  // Input mode
+  inputMode?: InputMode
+  txHash?: string
 
   // Simulation result (if available)
   simulationResult?: {

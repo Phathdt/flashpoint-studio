@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { useForm, type SubmitHandler } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { Share2, Copy, ClipboardPaste, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
-import { toast } from 'sonner'
 import { TraceVisualizer } from '@/components/TraceVisualizer'
 import { ShareModal } from '@/components/ShareModal'
 import { Settings } from '@/components/Settings'
@@ -23,55 +22,15 @@ import {
   useApiExecutionStrategy,
   useApiRateLimit,
   useFormPersistence,
+  useTransactionAutoFetch,
+  useAppFormHandlers,
+  useInputModeManager,
+  populateFormFields,
 } from '@/hooks'
-import { trackSimulation, trackShare, trackFormAction } from '@/lib/analytics'
-
-const evmTracingSchema = z.object({
-  rpcUrl: z.string().url({ message: 'Must be a valid URL' }),
-  payload: z.string().min(1, 'Payload is required'),
-  fromAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
-  toAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
-  blockNumber: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val || val === '') return true
-        // Allow decimal numbers or hex numbers (0x prefix)
-        return /^\d+$/.test(val) || /^0x[0-9a-fA-F]+$/.test(val)
-      },
-      {
-        message: 'Must be a valid block number (decimal or hex with 0x prefix)',
-      }
-    ),
-  apiEtherscanUrl: z
-    .string()
-    .optional()
-    .refine(
-      (val) =>
-        !val ||
-        val === '' ||
-        z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
-      {
-        message: 'Must be a valid URL',
-      }
-    ),
-  etherscanUrl: z
-    .string()
-    .optional()
-    .refine(
-      (val) =>
-        !val ||
-        val === '' ||
-        z.string().url({ message: 'Must be a valid URL' }).safeParse(val).success,
-      {
-        message: 'Must be a valid URL',
-      }
-    ),
-  etherscanApiKey: z.string().optional(),
-})
-
-type EVMTracingFormData = z.infer<typeof evmTracingSchema>
+import { trackSimulation } from '@/lib/analytics'
+import { TransactionFetcher } from '@/lib/transaction-fetcher'
+import { InputMode } from '@/lib/constants'
+import { evmTracingSchema, type EVMTracingFormData } from '@/lib/schemas'
 
 function App() {
   // Modal state
@@ -80,7 +39,13 @@ function App() {
   // Form setup
   const form = useForm<EVMTracingFormData>({
     resolver: zodResolver(evmTracingSchema),
-    defaultValues: {},
+    defaultValues: {
+      inputMode: InputMode.MANUAL,
+      rpcUrl: '',
+      payload: '',
+      fromAddress: '',
+      toAddress: '',
+    },
   })
 
   const {
@@ -89,7 +54,13 @@ function App() {
     formState: { errors },
     setValue,
     getValues,
+    watch,
   } = form
+
+  // Watch form values for reactive updates
+  const watchedRpcUrl = watch('rpcUrl')
+  const watchedTxHash = watch('txHash')
+  const watchedInputMode = watch('inputMode')
 
   // Custom hooks for business logic
   const {
@@ -110,28 +81,23 @@ function App() {
 
   const { simulationResult: loadedSimulationResult } = useLoadSharedTransaction({
     onSuccess: (data) => {
-      // Auto-populate form with loaded data
-      if (data.payload) setValue('payload', data.payload)
-      if (data.fromAddress) setValue('fromAddress', data.fromAddress)
-      if (data.toAddress) setValue('toAddress', data.toAddress)
-      if (data.blockNumber) setValue('blockNumber', data.blockNumber)
-      if (data.apiEtherscanUrl) setValue('apiEtherscanUrl', data.apiEtherscanUrl)
-      if (data.etherscanUrl) setValue('etherscanUrl', data.etherscanUrl)
-      // Note: etherscanApiKey is not loaded from shared links (not shared for security)
+      // Set input mode
+      const mode = (data.inputMode as InputMode) || InputMode.MANUAL
+      setValue('inputMode', mode)
+
+      // Populate form fields using utility function
+      populateFormFields(setValue, data, mode)
     },
   })
 
   const { copyToClipboard, pasteFromClipboard } = useClipboardForm({
     onPasteSuccess: (data) => {
-      // Auto-populate form with pasted data
-      if (data.rpcUrl) setValue('rpcUrl', data.rpcUrl)
-      if (data.fromAddress) setValue('fromAddress', data.fromAddress)
-      if (data.toAddress) setValue('toAddress', data.toAddress)
-      if (data.payload) setValue('payload', data.payload)
-      if (data.blockNumber) setValue('blockNumber', data.blockNumber)
-      if (data.apiEtherscanUrl) setValue('apiEtherscanUrl', data.apiEtherscanUrl)
-      if (data.etherscanUrl) setValue('etherscanUrl', data.etherscanUrl)
-      if (data.etherscanApiKey) setValue('etherscanApiKey', data.etherscanApiKey)
+      // Set input mode
+      const mode = (data.inputMode as InputMode) || InputMode.MANUAL
+      setValue('inputMode', mode)
+
+      // Populate form fields using utility function
+      populateFormFields(setValue, data, mode)
     },
   })
 
@@ -142,90 +108,47 @@ function App() {
 
   const { saveFormData, restoreFormData, hasStoredData } = useFormPersistence(setValue)
 
+  // Transaction fetching hook for txHash mode (must be declared early)
+  const {
+    data: fetchedTxData,
+    isFetching,
+    error: fetchError,
+    reset: resetFetch,
+  } = useTransactionAutoFetch({
+    enabled: watchedInputMode === InputMode.TX_HASH,
+    rpcUrl: watchedRpcUrl || '',
+    txHash: watchedTxHash || '',
+    debounceMs: 500,
+    onSuccess: (data) => {
+      // Auto-populate form fields
+      const formatted = TransactionFetcher.formatTransactionData(data)
+      populateFormFields(setValue, formatted, InputMode.TX_HASH)
+    },
+    onError: (error) => {
+      console.error('Failed to fetch transaction:', error)
+    },
+  })
+
+  // Input mode management
+  const { inputMode } = useInputModeManager(watchedInputMode, setValue, resetFetch)
+
   // Use loaded simulation result if available, otherwise use current simulation result
   const result = simulationResult || loadedSimulationResult
 
-  // Form handlers
-  const onSimulate: SubmitHandler<EVMTracingFormData> = async (data) => {
-    await simulate({
-      rpcUrl: data.rpcUrl,
-      payload: data.payload,
-      fromAddress: data.fromAddress,
-      toAddress: data.toAddress,
-      blockNumber: data.blockNumber,
-      apiEtherscanUrl: data.apiEtherscanUrl,
-      etherscanUrl: data.etherscanUrl,
-      etherscanApiKey: data.etherscanApiKey,
-      apiExecutionStrategy,
-      apiRateLimit,
-    })
-
-    // Save form data to localStorage after simulation (success or failure)
-    saveFormData({
-      rpcUrl: data.rpcUrl,
-      payload: data.payload,
-      fromAddress: data.fromAddress,
-      toAddress: data.toAddress,
-      blockNumber: data.blockNumber,
-      apiEtherscanUrl: data.apiEtherscanUrl,
-      etherscanUrl: data.etherscanUrl,
-      etherscanApiKey: data.etherscanApiKey,
-    })
-  }
-
-  const onShare = async () => {
-    const values = getValues()
-    await share({
-      payload: values.payload,
-      fromAddress: values.fromAddress,
-      toAddress: values.toAddress,
-      blockNumber: values.blockNumber,
-      apiEtherscanUrl: values.apiEtherscanUrl,
-      etherscanUrl: values.etherscanUrl,
-      etherscanApiKey: values.etherscanApiKey,
-      result: simulationResult || undefined,
-    })
-
-    // Track share event
-    trackShare()
-  }
-
-  const onCopyToClipboard = async () => {
-    const values = getValues()
-    await copyToClipboard({
-      rpcUrl: values.rpcUrl || '',
-      payload: values.payload || '',
-      fromAddress: values.fromAddress || '',
-      toAddress: values.toAddress || '',
-      blockNumber: values.blockNumber,
-      apiEtherscanUrl: values.apiEtherscanUrl,
-      etherscanUrl: values.etherscanUrl,
-      etherscanApiKey: values.etherscanApiKey,
-    })
-
-    // Track copy action
-    trackFormAction('copy')
-  }
-
-  const onPasteFromClipboard = async () => {
-    await pasteFromClipboard()
-
-    // Track paste action
-    trackFormAction('paste')
-  }
-
-  const onRestoreLastSimulation = () => {
-    const success = restoreFormData()
-    if (success) {
-      toast.success('Form Restored', {
-        description: 'Last simulation data has been restored',
-      })
-    } else {
-      toast.error('Restore Failed', {
-        description: 'No saved simulation data found',
-      })
-    }
-  }
+  // Form action handlers (extracted to custom hook)
+  const { onSimulate, onShare, onCopy, onPaste, onRestore } = useAppFormHandlers({
+    getValues,
+    simulate,
+    share,
+    copyToClipboard,
+    pasteFromClipboard,
+    saveFormData,
+    restoreFormData,
+    fetchedTxData,
+    simulationResult,
+    apiExecutionStrategy,
+    apiRateLimit,
+  })
 
   return (
     <>
@@ -251,92 +174,233 @@ function App() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSimulate)} className="space-y-4 md:space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="rpcUrl">RPC URL</Label>
-                  <Input
-                    id="rpcUrl"
-                    placeholder="https://eth-mainnet.g.alchemy.com/v2/..."
-                    {...register('rpcUrl')}
-                  />
-                  {errors.rpcUrl && (
-                    <p className="text-sm text-destructive">{errors.rpcUrl.message}</p>
-                  )}
-                </div>
+                <Tabs
+                  value={inputMode}
+                  onValueChange={(value) => {
+                    setValue('inputMode', value as InputMode)
+                  }}
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value={InputMode.MANUAL}>Manual Input</TabsTrigger>
+                    <TabsTrigger value={InputMode.TX_HASH}>Transaction Hash</TabsTrigger>
+                  </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="fromAddress">From Address</Label>
-                  <Input id="fromAddress" placeholder="0x..." {...register('fromAddress')} />
-                  {errors.fromAddress && (
-                    <p className="text-sm text-destructive">{errors.fromAddress.message}</p>
-                  )}
-                </div>
+                  {/* Manual Input Tab */}
+                  <TabsContent value={InputMode.MANUAL} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rpcUrl">RPC URL</Label>
+                      <Input
+                        id="rpcUrl"
+                        placeholder="https://eth-mainnet.g.alchemy.com/v2/..."
+                        {...register('rpcUrl')}
+                      />
+                      {errors.rpcUrl && (
+                        <p className="text-sm text-destructive">{errors.rpcUrl.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="toAddress">To Address</Label>
-                  <Input id="toAddress" placeholder="0x..." {...register('toAddress')} />
-                  {errors.toAddress && (
-                    <p className="text-sm text-destructive">{errors.toAddress.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fromAddress">From Address</Label>
+                      <Input id="fromAddress" placeholder="0x..." {...register('fromAddress')} />
+                      {errors.fromAddress && (
+                        <p className="text-sm text-destructive">{errors.fromAddress.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="payload">Payload</Label>
-                  <Input id="payload" placeholder="0x..." {...register('payload')} />
-                  {errors.payload && (
-                    <p className="text-sm text-destructive">{errors.payload.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="toAddress">To Address</Label>
+                      <Input id="toAddress" placeholder="0x..." {...register('toAddress')} />
+                      {errors.toAddress && (
+                        <p className="text-sm text-destructive">{errors.toAddress.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="blockNumber">Block Number (Optional)</Label>
-                  <Input
-                    id="blockNumber"
-                    placeholder="latest (or specify: 5000000 or 0x4C4B40)"
-                    {...register('blockNumber')}
-                  />
-                  {errors.blockNumber && (
-                    <p className="text-sm text-destructive">{errors.blockNumber.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payload">Payload</Label>
+                      <Input id="payload" placeholder="0x..." {...register('payload')} />
+                      {errors.payload && (
+                        <p className="text-sm text-destructive">{errors.payload.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="apiEtherscanUrl">API Etherscan URL (Optional)</Label>
-                  <Input
-                    id="apiEtherscanUrl"
-                    placeholder="https://api.etherscan.io/v2/api (default)"
-                    {...register('apiEtherscanUrl')}
-                  />
-                  {errors.apiEtherscanUrl && (
-                    <p className="text-sm text-destructive">{errors.apiEtherscanUrl.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="blockNumber">Block Number (Optional)</Label>
+                      <Input
+                        id="blockNumber"
+                        placeholder="latest (or specify: 5000000 or 0x4C4B40)"
+                        {...register('blockNumber')}
+                      />
+                      {errors.blockNumber && (
+                        <p className="text-sm text-destructive">{errors.blockNumber.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="etherscanUrl">Etherscan URL (Optional)</Label>
-                  <Input
-                    id="etherscanUrl"
-                    placeholder="https://etherscan.io (auto-detected if empty)"
-                    {...register('etherscanUrl')}
-                  />
-                  {errors.etherscanUrl && (
-                    <p className="text-sm text-destructive">{errors.etherscanUrl.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="apiEtherscanUrl">API Etherscan URL (Optional)</Label>
+                      <Input
+                        id="apiEtherscanUrl"
+                        placeholder="https://api.etherscan.io/v2/api (default)"
+                        {...register('apiEtherscanUrl')}
+                      />
+                      {errors.apiEtherscanUrl && (
+                        <p className="text-sm text-destructive">{errors.apiEtherscanUrl.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="etherscanApiKey">Etherscan API Key(s) (Optional)</Label>
-                  <Input
-                    id="etherscanApiKey"
-                    placeholder="key1,key2,key3 (comma-separated for rotation)"
-                    {...register('etherscanApiKey')}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Multiple keys can be comma-separated for rotation to avoid rate limits
-                  </p>
-                  {errors.etherscanApiKey && (
-                    <p className="text-sm text-destructive">{errors.etherscanApiKey.message}</p>
-                  )}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="etherscanUrl">Etherscan URL (Optional)</Label>
+                      <Input
+                        id="etherscanUrl"
+                        placeholder="https://etherscan.io (auto-detected if empty)"
+                        {...register('etherscanUrl')}
+                      />
+                      {errors.etherscanUrl && (
+                        <p className="text-sm text-destructive">{errors.etherscanUrl.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="etherscanApiKey">Etherscan API Key(s) (Optional)</Label>
+                      <Input
+                        id="etherscanApiKey"
+                        placeholder="key1,key2,key3 (comma-separated for rotation)"
+                        {...register('etherscanApiKey')}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Multiple keys can be comma-separated for rotation to avoid rate limits
+                      </p>
+                      {errors.etherscanApiKey && (
+                        <p className="text-sm text-destructive">{errors.etherscanApiKey.message}</p>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Transaction Hash Tab */}
+                  <TabsContent value={InputMode.TX_HASH} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rpcUrl-hash">RPC URL</Label>
+                      <Input
+                        id="rpcUrl-hash"
+                        placeholder="https://eth-mainnet.g.alchemy.com/v2/..."
+                        {...register('rpcUrl')}
+                      />
+                      {errors.rpcUrl && (
+                        <p className="text-sm text-destructive">{errors.rpcUrl.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="txHash">Transaction Hash</Label>
+                      <Input
+                        id="txHash"
+                        placeholder="0x..."
+                        {...register('txHash')}
+                        disabled={isFetching}
+                      />
+                      {errors.txHash && (
+                        <p className="text-sm text-destructive">{errors.txHash.message}</p>
+                      )}
+                      {isFetching && (
+                        <p className="text-sm text-muted-foreground">
+                          Fetching transaction details...
+                        </p>
+                      )}
+                      {fetchError && <p className="text-sm text-destructive">{fetchError}</p>}
+                    </div>
+
+                    {/* Display fetched transaction details */}
+                    {fetchedTxData && (
+                      <Card className="bg-muted/50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm">Fetched Transaction Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">From Address</Label>
+                              <div className="font-mono text-xs break-all">
+                                {fetchedTxData.from}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">To Address</Label>
+                              <div className="font-mono text-xs break-all">
+                                {fetchedTxData.to || '0x0000000000000000000000000000000000000000'}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">
+                                Transaction Block
+                              </Label>
+                              <div className="font-mono text-xs">{fetchedTxData.blockNumber}</div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">
+                                Simulation Block
+                              </Label>
+                              <div className="font-mono text-xs">
+                                {TransactionFetcher.getSimulationBlockNumber(
+                                  fetchedTxData.blockNumber
+                                )}
+                              </div>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs text-muted-foreground">Data Size</Label>
+                              <div className="font-mono text-xs">
+                                {fetchedTxData.data.length} chars
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Payload Preview</Label>
+                            <div className="font-mono text-xs break-all bg-background p-2 rounded">
+                              {fetchedTxData.data.slice(0, 66)}...
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="apiEtherscanUrl-hash">API Etherscan URL (Optional)</Label>
+                      <Input
+                        id="apiEtherscanUrl-hash"
+                        placeholder="https://api.etherscan.io/v2/api (default)"
+                        {...register('apiEtherscanUrl')}
+                      />
+                      {errors.apiEtherscanUrl && (
+                        <p className="text-sm text-destructive">{errors.apiEtherscanUrl.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="etherscanUrl-hash">Etherscan URL (Optional)</Label>
+                      <Input
+                        id="etherscanUrl-hash"
+                        placeholder="https://etherscan.io (auto-detected if empty)"
+                        {...register('etherscanUrl')}
+                      />
+                      {errors.etherscanUrl && (
+                        <p className="text-sm text-destructive">{errors.etherscanUrl.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="etherscanApiKey-hash">Etherscan API Key(s) (Optional)</Label>
+                      <Input
+                        id="etherscanApiKey-hash"
+                        placeholder="key1,key2,key3 (comma-separated for rotation)"
+                        {...register('etherscanApiKey')}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Multiple keys can be comma-separated for rotation to avoid rate limits
+                      </p>
+                      {errors.etherscanApiKey && (
+                        <p className="text-sm text-destructive">{errors.etherscanApiKey.message}</p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <div className="flex gap-2 sm:gap-3">
@@ -344,7 +408,7 @@ function App() {
                       type="button"
                       variant="outline"
                       size="lg"
-                      onClick={onCopyToClipboard}
+                      onClick={onCopy}
                       title="Copy form data to clipboard"
                       className="flex-1 sm:flex-none"
                     >
@@ -354,7 +418,7 @@ function App() {
                       type="button"
                       variant="outline"
                       size="lg"
-                      onClick={onPasteFromClipboard}
+                      onClick={onPaste}
                       title="Paste form data from clipboard"
                       className="flex-1 sm:flex-none"
                     >
@@ -364,7 +428,7 @@ function App() {
                       type="button"
                       variant="outline"
                       size="lg"
-                      onClick={onRestoreLastSimulation}
+                      onClick={onRestore}
                       disabled={!hasStoredData}
                       title="Restore last simulation"
                       className="flex-1 sm:flex-none"
@@ -387,7 +451,10 @@ function App() {
                     type="submit"
                     className="w-full sm:flex-1"
                     size="lg"
-                    disabled={isSimulating}
+                    disabled={
+                      isSimulating ||
+                      (inputMode === InputMode.TX_HASH && (!fetchedTxData || isFetching))
+                    }
                   >
                     {isSimulating ? 'Simulating...' : 'Simulate'}
                   </Button>

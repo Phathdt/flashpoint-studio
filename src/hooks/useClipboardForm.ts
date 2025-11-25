@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { InputMode } from '@/lib/constants'
 import type { FormData, UseClipboardFormOptions, UseClipboardFormReturn } from './types'
 
 /**
@@ -45,17 +46,30 @@ export function useClipboardForm(options?: UseClipboardFormOptions): UseClipboar
       setIsCopying(true)
 
       try {
-        // Prepare form data with all fields
-        const formData = {
+        // Prepare form data based on input mode
+        const inputMode = data.inputMode || InputMode.MANUAL
+        const baseFormData = {
+          inputMode,
           rpcUrl: data.rpcUrl || '',
-          fromAddress: data.fromAddress || '',
-          toAddress: data.toAddress || '',
-          payload: data.payload || '',
           blockNumber: data.blockNumber || '',
           apiEtherscanUrl: data.apiEtherscanUrl || '',
           etherscanUrl: data.etherscanUrl || '',
           etherscanApiKey: data.etherscanApiKey || '',
         }
+
+        // Only include mode-specific fields
+        const formData =
+          inputMode === InputMode.TX_HASH
+            ? {
+                ...baseFormData,
+                txHash: data.txHash || '',
+              }
+            : {
+                ...baseFormData,
+                fromAddress: data.fromAddress || '',
+                toAddress: data.toAddress || '',
+                payload: data.payload || '',
+              }
 
         await navigator.clipboard.writeText(JSON.stringify(formData, null, 2))
 
@@ -89,9 +103,18 @@ export function useClipboardForm(options?: UseClipboardFormOptions): UseClipboar
       const clipboardText = await navigator.clipboard.readText()
       const formData = JSON.parse(clipboardText) as Partial<FormData>
 
-      // Validate that we have at least some recognizable form fields
-      if (!formData.payload && !formData.fromAddress && !formData.toAddress && !formData.rpcUrl) {
-        throw new Error('Clipboard does not contain valid form data')
+      const inputMode = formData.inputMode || InputMode.MANUAL
+
+      // Validate based on input mode
+      if (inputMode === InputMode.TX_HASH) {
+        if (!formData.txHash && !formData.rpcUrl) {
+          throw new Error('Clipboard does not contain valid transaction hash form data')
+        }
+      } else {
+        // Validate manual mode fields
+        if (!formData.payload && !formData.fromAddress && !formData.toAddress && !formData.rpcUrl) {
+          throw new Error('Clipboard does not contain valid form data')
+        }
       }
 
       // Create complete form data object with defaults
@@ -104,6 +127,8 @@ export function useClipboardForm(options?: UseClipboardFormOptions): UseClipboar
         apiEtherscanUrl: formData.apiEtherscanUrl,
         etherscanUrl: formData.etherscanUrl,
         etherscanApiKey: formData.etherscanApiKey,
+        inputMode,
+        txHash: formData.txHash,
       }
 
       toast.success('Pasted from clipboard!', {

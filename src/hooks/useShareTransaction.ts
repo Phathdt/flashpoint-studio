@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { PrivateBinShareClient } from '@/lib/privatebin-client'
+import { InputMode } from '@/lib/constants'
 import type { ShareData, UseShareTransactionOptions, UseShareTransactionReturn } from './types'
 
 /**
@@ -49,17 +50,33 @@ export function useShareTransaction(
 
   const share = useCallback(
     async (data: ShareData) => {
-      // Validate required fields
-      if (!data.payload || !data.fromAddress || !data.toAddress) {
-        const validationError = new Error(
-          'Missing required fields: payload, fromAddress, and toAddress are required'
-        )
-        setError(validationError)
-        toast.error('Missing required fields', {
-          description: 'Please fill in payload, from address, and to address before sharing',
-        })
-        options?.onError?.(validationError)
-        return
+      // Validate based on input mode
+      const inputMode = data.inputMode || InputMode.MANUAL
+
+      if (inputMode === InputMode.MANUAL) {
+        // Manual mode requires transaction data
+        if (!data.payload || !data.fromAddress || !data.toAddress) {
+          const validationError = new Error(
+            'Missing required fields: payload, fromAddress, and toAddress are required'
+          )
+          setError(validationError)
+          toast.error('Missing required fields', {
+            description: 'Please fill in payload, from address, and to address before sharing',
+          })
+          options?.onError?.(validationError)
+          return
+        }
+      } else if (inputMode === InputMode.TX_HASH) {
+        // TxHash mode requires transaction hash
+        if (!data.txHash) {
+          const validationError = new Error('Missing required field: transaction hash is required')
+          setError(validationError)
+          toast.error('Missing transaction hash', {
+            description: 'Please enter a transaction hash before sharing',
+          })
+          options?.onError?.(validationError)
+          return
+        }
       }
 
       setIsSharing(true)
@@ -100,6 +117,8 @@ export function useShareTransaction(
           apiEtherscanUrl: data.apiEtherscanUrl, // Public URL - safe to share
           etherscanUrl: data.etherscanUrl, // Public URL - safe to share
           simulationResult: simulationResultData,
+          inputMode: data.inputMode,
+          txHash: data.txHash,
           // Security: rpcUrl and etherscanApiKey are intentionally excluded (contain sensitive API keys)
           // chainId in simulationResult is used to identify the network instead
         })

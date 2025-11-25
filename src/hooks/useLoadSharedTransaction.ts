@@ -78,6 +78,8 @@ export function useLoadSharedTransaction(
           blockNumber: fetchedData.blockNumber,
           apiEtherscanUrl: fetchedData.apiEtherscanUrl,
           etherscanUrl: fetchedData.etherscanUrl,
+          inputMode: fetchedData.inputMode,
+          txHash: fetchedData.txHash,
           // Note: etherscanApiKey is not shared for security reasons
         }
 

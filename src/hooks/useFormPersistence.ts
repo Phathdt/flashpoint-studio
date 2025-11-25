@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react'
 import type { UseFormSetValue, Path, PathValue } from 'react-hook-form'
+import { InputMode } from '@/lib/constants'
 
 const STORAGE_KEY = 'flashpoint-last-simulation-form'
 
 export interface PersistedFormData {
-  rpcUrl: string
-  payload: string
-  fromAddress: string
-  toAddress: string
+  rpcUrl?: string
+  payload?: string
+  fromAddress?: string
+  toAddress?: string
   blockNumber?: string
   apiEtherscanUrl?: string
   etherscanUrl?: string
   etherscanApiKey?: string
+  inputMode?: InputMode
+  txHash?: string
   timestamp?: number
 }
 
@@ -58,12 +61,23 @@ export function useFormPersistence<T extends PersistedFormData>(setValue: UseFor
         console.log('Restoring form data from localStorage')
 
         // Restore all fields with proper typing
+        const inputMode = parsed.inputMode || InputMode.MANUAL
+        if (parsed.inputMode)
+          setValue('inputMode' as Path<T>, parsed.inputMode as PathValue<T, Path<T>>)
+
         if (parsed.rpcUrl) setValue('rpcUrl' as Path<T>, parsed.rpcUrl as PathValue<T, Path<T>>)
-        if (parsed.payload) setValue('payload' as Path<T>, parsed.payload as PathValue<T, Path<T>>)
-        if (parsed.fromAddress)
-          setValue('fromAddress' as Path<T>, parsed.fromAddress as PathValue<T, Path<T>>)
-        if (parsed.toAddress)
-          setValue('toAddress' as Path<T>, parsed.toAddress as PathValue<T, Path<T>>)
+
+        if (inputMode === InputMode.TX_HASH && parsed.txHash) {
+          setValue('txHash' as Path<T>, parsed.txHash as PathValue<T, Path<T>>)
+        } else {
+          if (parsed.payload)
+            setValue('payload' as Path<T>, parsed.payload as PathValue<T, Path<T>>)
+          if (parsed.fromAddress)
+            setValue('fromAddress' as Path<T>, parsed.fromAddress as PathValue<T, Path<T>>)
+          if (parsed.toAddress)
+            setValue('toAddress' as Path<T>, parsed.toAddress as PathValue<T, Path<T>>)
+        }
+
         if (parsed.blockNumber)
           setValue('blockNumber' as Path<T>, parsed.blockNumber as PathValue<T, Path<T>>)
         if (parsed.apiEtherscanUrl)
